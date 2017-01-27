@@ -17,11 +17,15 @@ namespace TranslationUnit
 
         double[] ISensor.getValue( double[] input )
         {
+            // Recompute and return data ready to be used.
+
             throw new NotImplementedException();
         }
 
         double[] ISensor.getState()
         {
+            // Need to subtract the values from previous sensors; just don't actually recompute stuff.
+
             return _state;
         }
 

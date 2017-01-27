@@ -7,14 +7,17 @@ namespace TranslationUnit
     enum eSensor
     {
         Hand = 0,
-        Thumb_Distal,
+
         Thumb_Proximal,
+        Thumb_Distal,
         Thumb_Pressure,
-        Index_Middle,
+
         Index_Proximal,
+        Index_Middle,
         Index_Pressure,
-        Middle_Middle,
+
         Middle_Proximal,
+        Middle_Middle,
         Middle_Pressure
     };
 
@@ -129,20 +132,20 @@ namespace TranslationUnit
             _sensorMap.Clear();
 
             foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _inputMap.Add( id, new double[] { 0.5, 0.5, 0.5 } );
+                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
 
             foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
                 _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
 
             _sensorMap.Add( eSensor.Hand, new CKinematicSensor( null ) );
-            _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( null ) );
-            _sensorMap.Add( eSensor.Thumb_Proximal, new CKinematicSensor( _sensorMap[eSensor.Thumb_Distal] ) );
+            _sensorMap.Add( eSensor.Thumb_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+            _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( _sensorMap[eSensor.Thumb_Proximal] ) );
             _sensorMap.Add( eSensor.Thumb_Pressure, new CPressureSensor() );
-            _sensorMap.Add( eSensor.Index_Middle, new CKinematicSensor( null ) );
-            _sensorMap.Add( eSensor.Index_Proximal, new CKinematicSensor( _sensorMap[eSensor.Index_Middle] ) );
+            _sensorMap.Add( eSensor.Index_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+            _sensorMap.Add( eSensor.Index_Middle, new CKinematicSensor( _sensorMap[eSensor.Index_Middle] ) );
             _sensorMap.Add( eSensor.Index_Pressure, new CPressureSensor() );
-            _sensorMap.Add( eSensor.Middle_Middle, new CKinematicSensor( null ) );
-            _sensorMap.Add( eSensor.Middle_Proximal, new CKinematicSensor( _sensorMap[eSensor.Middle_Middle] ) );
+            _sensorMap.Add( eSensor.Middle_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+            _sensorMap.Add( eSensor.Middle_Middle, new CKinematicSensor( _sensorMap[eSensor.Middle_Middle] ) );
             _sensorMap.Add( eSensor.Middle_Pressure, new CPressureSensor() );
         }
     }
