@@ -2,6 +2,7 @@
 {
     internal interface ISensor
     {
-        double[] getValue();
+        double[] getValue( double[] input );
+        double[] getState();
     }
 }

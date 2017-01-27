@@ -11,7 +11,12 @@ namespace TranslationUnit
             _filterArray = new IKalmanFilter[] { new CKalmanFilter(), new CKalmanFilter(), new CKalmanFilter() };
         }
 
-        double[] ISensor.getValue()
+        double[] ISensor.getValue( double[] input )
+        {
+            throw new NotImplementedException();
+        }
+
+        double[] ISensor.getState()
         {
             throw new NotImplementedException();
         }

@@ -2,6 +2,6 @@
 {
     interface IKalmanFilter
     {
-        double[] filter( double[] array );
+        double update( double input );
     }
 }

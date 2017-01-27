@@ -31,6 +31,8 @@ namespace TranslationUnit
 
     public class CTranslationUnit : ITranslationUnit
     {
+        private Dictionary<eSensor, double[]> _inputMap;
+        private Dictionary<eSensor, double[]> _valueMap;
         private Dictionary<eSensor, ISensor> _sensorMap;
         private SerialPort _serialPort;
         private CGravityCompensator _gravityCompensator;
@@ -49,12 +51,23 @@ namespace TranslationUnit
 
         void ITranslationUnit.snapshotGlove()
         {
-            throw new NotImplementedException();
+            _inputMap.Clear();
+
+            //TODO: Actual read method. This is a temporary method that just pretends to read stuff.
+            //Needs try/catch
+            //string rawData = _serialPort.ReadExisting();
+            //double[] dblData = Array.ConvertAll(rawData.split(','), Double.Parse);
+
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
+
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) ) 
+                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
         }
 
         double[] ITranslationUnit.readSensor( int sensorID )
         {
-            throw new NotImplementedException();
+            return _valueMap[( eSensor )sensorID];
         }
 
         void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
@@ -102,10 +115,24 @@ namespace TranslationUnit
 
         private void _initializeSensors()
         {
+            if ( _inputMap == null )
+                _inputMap = new Dictionary<eSensor, double[]>();
+
+            if ( _valueMap == null )
+                _valueMap = new Dictionary<eSensor, double[]>();
+
             if ( _sensorMap == null )
                 _sensorMap = new Dictionary<eSensor, ISensor>();
 
+            _inputMap.Clear();
+            _valueMap.Clear();
             _sensorMap.Clear();
+
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                _inputMap.Add( id, new double[] { 0.5, 0.5, 0.5 } );
+
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
 
             _sensorMap.Add( eSensor.Hand, new CKinematicSensor( null ) );
             _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( null ) );
