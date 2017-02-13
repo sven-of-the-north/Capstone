@@ -34,4 +34,17 @@ namespace TranslationUnit
             throw new NotImplementedException();
         }
     }
+
+    class MockKinematicSensor : ISensor
+    {
+        double[] ISensor.getState()
+        {
+            return new double[] { 0, 0, 0 };
+        }
+
+        double[] ISensor.getValue( double[] input )
+        {
+            return input;
+        }
+    }
 }

@@ -46,7 +46,6 @@
     <Compile Include="CGravityCompensator.cs" />
     <Compile Include="CKalmanFilter.cs" />
     <Compile Include="CKinematicSensor.cs" />
-    <Compile Include="CPressureSensor.cs" />
     <Compile Include="CTranslationUnit.cs" />
     <Compile Include="IKalmanFilter.cs" />
     <Compile Include="ISensor.cs" />

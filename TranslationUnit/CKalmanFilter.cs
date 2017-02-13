@@ -44,4 +44,12 @@ namespace TranslationUnit
             return _state._x;
         }
     }
+
+    class MockKalmanFilter : IKalmanFilter
+    {
+        double IKalmanFilter.update( double input )
+        {
+            return input;
+        }
+    }
 }

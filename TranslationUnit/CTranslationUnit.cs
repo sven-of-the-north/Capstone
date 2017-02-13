@@ -1,24 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Ports;
+using System.Threading;
 
 namespace TranslationUnit
 {
-    enum eSensor
+    public enum eSensor
     {
         Hand = 0,
-
         Thumb_Proximal,
         Thumb_Distal,
-        Thumb_Pressure,
-
         Index_Proximal,
         Index_Middle,
-        Index_Pressure,
-
         Middle_Proximal,
         Middle_Middle,
-        Middle_Pressure
     };
 
     [Serializable]
@@ -40,6 +36,9 @@ namespace TranslationUnit
         private SerialPort _serialPort;
         private CGravityCompensator _gravityCompensator;
 
+        private AutoResetEvent autoEvent = new AutoResetEvent(false);
+        private Timer _readTimer;
+
         CTranslationUnit( string portName, int baudRate = 9600, int dataBits = 8, Handshake handshake = Handshake.None, Parity parity = Parity.None, StopBits stopBits = StopBits.One )
         {
             if ( !_initialize( portName, baudRate, dataBits, handshake, parity, stopBits ) )
@@ -50,22 +49,7 @@ namespace TranslationUnit
         {
             _sensorMap.Clear();
             _serialPort.Dispose();
-        }
-
-        void ITranslationUnit.snapshotGlove()
-        {
-            _inputMap.Clear();
-
-            //TODO: Actual read method. This is a temporary method that just pretends to read stuff.
-            //Needs try/catch
-            //string rawData = _serialPort.ReadExisting();
-            //double[] dblData = Array.ConvertAll(rawData.split(','), Double.Parse);
-
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
-
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) ) 
-                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
+            _readTimer.Dispose();
         }
 
         double[] ITranslationUnit.readSensor( int sensorID )
@@ -85,11 +69,66 @@ namespace TranslationUnit
 
         void _serialPort_DataReceivedHandler( object sender, SerialDataReceivedEventArgs e )
         {
-            throw new NotImplementedException();
+            string rawData;
+            try
+            {
+                rawData = _serialPort.ReadLine();
+            }
+            catch
+            {
+                return;
+            }
+
+            Debug.Print( rawData );
+            double[] dblData = Array.ConvertAll(rawData.Split(';'), Double.Parse);
+
+            _inputMap[eSensor.Hand] = new double[] { dblData[0], dblData[1], dblData[2] };
+            _inputMap[eSensor.Thumb_Proximal] = new double[] { dblData[3], dblData[4], dblData[5] };
+            _inputMap[eSensor.Thumb_Distal] = new double[] { dblData[6], dblData[7], dblData[8] };
+            _inputMap[eSensor.Index_Proximal] = new double[] { dblData[9], dblData[10], dblData[11] };
+            _inputMap[eSensor.Index_Middle] = new double[] { dblData[12], dblData[13], dblData[14] };
+            _inputMap[eSensor.Middle_Proximal] = new double[] { dblData[15], dblData[16], dblData[17] };
+            _inputMap[eSensor.Middle_Middle] = new double[] { dblData[18], dblData[19], dblData[20] };
+
+            // Update calculations for each sensor
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
+        }
+
+        void _snapshotGlove( Object stateInfo )
+        {
+            string rawData;
+            try
+            {
+                rawData = _serialPort.ReadLine();
+
+            }
+            catch
+            {
+                return;
+            }
+
+            Debug.Print( rawData );
+            double[] dblData = Array.ConvertAll(rawData.Split(';'), Double.Parse);
+
+            _inputMap[eSensor.Hand] = new double[] { dblData[0], dblData[1], dblData[2] };
+            _inputMap[eSensor.Thumb_Proximal] = new double[] { dblData[3], dblData[4], dblData[5] };
+            _inputMap[eSensor.Thumb_Distal] = new double[] { dblData[6], dblData[7], dblData[8] };
+            _inputMap[eSensor.Index_Proximal] = new double[] { dblData[9], dblData[10], dblData[11] };
+            _inputMap[eSensor.Index_Middle] = new double[] { dblData[12], dblData[13], dblData[14] };
+            _inputMap[eSensor.Middle_Proximal] = new double[] { dblData[15], dblData[16], dblData[17] };
+            _inputMap[eSensor.Middle_Middle] = new double[] { dblData[18], dblData[19], dblData[20] };
+
+            // Update calculations for each sensor
+            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
         }
 
         private bool _initialize( string portName, int baudRate, int dataBits, Handshake handshake, Parity parity, StopBits stopBits )
         {
+            _initializeSensors();
+            _gravityCompensator = new CGravityCompensator();
+
             try
             {
                 _serialPort = new SerialPort( portName );
@@ -110,9 +149,6 @@ namespace TranslationUnit
                 return false;
             }
 
-            _initializeSensors();
-            _gravityCompensator = new CGravityCompensator();
-
             return true;
         }
 
@@ -130,23 +166,63 @@ namespace TranslationUnit
             _inputMap.Clear();
             _valueMap.Clear();
             _sensorMap.Clear();
+            
+            try
+            {
+                foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
+                    _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
+            }
+            catch
+            {
+                Debug.WriteLine( "Error initializing input values map." );
+            }
 
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
+            try
+            {
+                _sensorMap.Add( eSensor.Hand, new CKinematicSensor( null ) );
+                _sensorMap.Add( eSensor.Thumb_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+                _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( _sensorMap[eSensor.Thumb_Proximal] ) );
+                _sensorMap.Add( eSensor.Index_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+                _sensorMap.Add( eSensor.Index_Middle, new CKinematicSensor( _sensorMap[eSensor.Index_Middle] ) );
+                _sensorMap.Add( eSensor.Middle_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
+                _sensorMap.Add( eSensor.Middle_Middle, new CKinematicSensor( _sensorMap[eSensor.Middle_Middle] ) );
+            }
+            catch
+            {
+                Debug.WriteLine( "Error initializing sensor objects map." );
+            }
 
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
+            if ( _readTimer == null )
+            {
+                try
+                {
+                    _readTimer = new Timer( this._snapshotGlove, autoEvent, 500, 15 );
+                }
+                catch
+                {
+                    Debug.WriteLine( "Error initializing timer thread." );
+                }
+            }
+        }
+    }
 
-            _sensorMap.Add( eSensor.Hand, new CKinematicSensor( null ) );
-            _sensorMap.Add( eSensor.Thumb_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-            _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( _sensorMap[eSensor.Thumb_Proximal] ) );
-            _sensorMap.Add( eSensor.Thumb_Pressure, new CPressureSensor() );
-            _sensorMap.Add( eSensor.Index_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-            _sensorMap.Add( eSensor.Index_Middle, new CKinematicSensor( _sensorMap[eSensor.Index_Middle] ) );
-            _sensorMap.Add( eSensor.Index_Pressure, new CPressureSensor() );
-            _sensorMap.Add( eSensor.Middle_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-            _sensorMap.Add( eSensor.Middle_Middle, new CKinematicSensor( _sensorMap[eSensor.Middle_Middle] ) );
-            _sensorMap.Add( eSensor.Middle_Pressure, new CPressureSensor() );
+    public class MockTranslationUnit : ITranslationUnit
+    {
+        MockTranslationUnit(){}
+
+        void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
+        {
+            return;
+        }
+
+        bool ITranslationUnit.initialize( string portName, int baudRate, int dataBits, Handshake handshake, Parity parity, StopBits stopBits )
+        {
+            return true;
+        }
+
+        double[] ITranslationUnit.readSensor( int sensorID )
+        {
+            return new double[] { 0, 0, 0 };
         }
     }
 }
