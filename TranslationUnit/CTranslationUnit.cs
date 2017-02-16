@@ -39,7 +39,7 @@ namespace TranslationUnit
         private AutoResetEvent autoEvent = new AutoResetEvent(false);
         private Timer _readTimer;
 
-        CTranslationUnit( string portName, int baudRate = 9600, int dataBits = 8, Handshake handshake = Handshake.None, Parity parity = Parity.None, StopBits stopBits = StopBits.One )
+        public CTranslationUnit( string portName, int baudRate = 9600, int dataBits = 8, Handshake handshake = Handshake.None, Parity parity = Parity.None, StopBits stopBits = StopBits.One )
         {
             if ( !_initialize( portName, baudRate, dataBits, handshake, parity, stopBits ) )
                 throw new InvalidSerialPortException( "Could not open serial port for communication. Are all the parameters given correct?" );
@@ -211,7 +211,7 @@ namespace TranslationUnit
 
     public class MockTranslationUnit : ITranslationUnit
     {
-        MockTranslationUnit(){}
+        public MockTranslationUnit(){}
 
         void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
         {
