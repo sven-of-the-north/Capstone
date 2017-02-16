@@ -52,9 +52,12 @@ namespace TranslationUnit
             _readTimer.Dispose();
         }
 
-        double[] ITranslationUnit.readSensor( int sensorID )
+        double[] ITranslationUnit.readSensor( int sensorID, bool debug, double x, double y, double z )
         {
-            return _valueMap[( eSensor )sensorID];
+            if ( !debug )
+                return _valueMap[( eSensor )sensorID];
+
+            return new double[] { x, y, z };
         }
 
         void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
@@ -220,9 +223,9 @@ namespace TranslationUnit
             return true;
         }
 
-        double[] ITranslationUnit.readSensor( int sensorID )
+        double[] ITranslationUnit.readSensor( int sensorID, bool debug, double x, double y, double z )
         {
-            return new double[] { 0, 0, 0 };
+            return new double[] { x, y, z };
         }
     }
 }
