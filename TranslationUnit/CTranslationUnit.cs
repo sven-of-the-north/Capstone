@@ -6,17 +6,33 @@ using System.Threading;
 
 namespace TranslationUnit
 {
-    public enum eSensor
+    /// <summary>
+    /// Motor bitmasks
+    /// </summary>
+    public enum eMotors
     {
-        Hand = 0,
-        Thumb_Proximal,
-        Thumb_Distal,
-        Index_Proximal,
-        Index_Middle,
-        Middle_Proximal,
-        Middle_Middle,
+        none = 0,
+        Motor7 = 2,
+        Motor6 = 4,
+        Motor5 = 8,
+        Motor4 = 16,
+        Motor3 = 32,
+        Motor2 = 64,
+        Motor1 = 128  
     };
 
+    /// <summary>
+    /// Sensor types
+    /// </summary>
+    public enum eSensorType
+    {
+        Accelerometer = 0,
+        Gyroscope
+    };
+
+    /// <summary>
+    /// Exception thrown if the serial port specified could not be initialized/opened
+    /// </summary>
     [Serializable]
     public class InvalidSerialPortException : Exception
     {
@@ -28,106 +44,141 @@ namespace TranslationUnit
           System.Runtime.Serialization.StreamingContext context ) : base( info, context ) { }
     }
 
+    /// <summary>
+    /// Main object used to represent the state of the Force Feedback Glove
+    /// </summary>
     public class CTranslationUnit : ITranslationUnit
     {
-        private Dictionary<eSensor, double[]> _inputMap;
+        private const double NORMALIZE_ACCEL = 0.000061;
+        private const double NORMALIZE_GYRO = 0.00875;
+
+        private const int BAUDRATE = 115200;
+        private const int DATABITS = 8;
+        private const Handshake HANDSHAKE = Handshake.None;
+        private const Parity PARITY = Parity.None;
+        private const StopBits STOPBITS = StopBits.One;
+
         private Dictionary<eSensor, double[]> _valueMap;
         private Dictionary<eSensor, ISensor> _sensorMap;
         private SerialPort _serialPort;
         private CGravityCompensator _gravityCompensator;
 
-        private AutoResetEvent autoEvent = new AutoResetEvent(false);
-        private Timer _readTimer;
-
-        public CTranslationUnit( string portName, int baudRate = 9600, int dataBits = 8, Handshake handshake = Handshake.None, Parity parity = Parity.None, StopBits stopBits = StopBits.One )
+        /// <summary>
+        /// Constructor for a Translation Unit object
+        /// </summary>
+        /// <param name="portName"> Serial port name </param>
+        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
+        /// <param name="dataBits"> Serial port data bits (default 8) </param>
+        /// <param name="handshake"> Serial port handshaking value (default None) </param>
+        /// <param name="parity"> Serial port parity value (default None) </param>
+        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
+        public CTranslationUnit( string portName )
         {
-            if ( !_initialize( portName, baudRate, dataBits, handshake, parity, stopBits ) )
-                throw new InvalidSerialPortException( "Could not open serial port for communication. Are all the parameters given correct?" );
+            if ( !_initialize( portName ) )
+                throw new InvalidSerialPortException( "Could not open serial port for communication." );
         }
 
+        /// <summary>
+        /// Translation Unit destructor
+        /// </summary>
         ~CTranslationUnit()
         {
             _sensorMap.Clear();
+            _valueMap.Clear();
             _serialPort.Dispose();
-            _readTimer.Dispose();
         }
 
-        double[] ITranslationUnit.readSensor( int sensorID, bool debug, double x, double y, double z )
+        /// <summary>
+        /// Gets the latest reading from the sensor specified by SensorID
+        /// </summary>
+        /// <param name="sensorID"> Sensor to read from </param>
+        /// <param name="x"> ignored </param>
+        /// <param name="y"> ignored </param>
+        /// <param name="z"> ignored </param>
+        /// <returns> [x, y, z] values read from the specified sensor </returns>
+        double[] ITranslationUnit.readSensor( eSensor sensorID, double x, double y, double z )
         {
-            if ( !debug )
-                return _valueMap[( eSensor )sensorID];
-
-            return new double[] { x, y, z };
+            return _valueMap[sensorID];
         }
 
+        /// <summary>
+        /// Activates the brake specified by brakeID
+        /// </summary>
+        /// <param name="brakeID"> Brake to activate </param>
+        /// <param name="brakeValue"> ignored (always 1) </param>
         void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
         {
             throw new NotImplementedException();
         }
 
-        bool ITranslationUnit.initialize( string portName, int baudRate, int dataBits, Handshake handshake, Parity parity, StopBits stopBits )
+        /// <summary>
+        /// (Re-)Initializes all parameters and data fields within the Translation Unit
+        /// </summary>
+        /// <param name="portName"> Serial port name </param>
+        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
+        /// <param name="dataBits"> Serial port data bits (default 8) </param>
+        /// <param name="handshake"> Serial port handshaking value (default None) </param>
+        /// <param name="parity"> Serial port parity value (default None) </param>
+        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
+        /// <returns> Initialization successful or not </returns>
+        bool ITranslationUnit.initialize( string portName )
         {
-            return _initialize( portName, baudRate, dataBits, handshake, parity, stopBits );
+            return _initialize( portName );
         }
 
+        /// <summary>
+        /// Handler for receiving serial data objects
+        /// </summary>
+        /// <param name="sender"> ignored </param>
+        /// <param name="e"> ignored </param>
         void _serialPort_DataReceivedHandler( object sender, SerialDataReceivedEventArgs e )
         {
-            string rawData;
+            string rawData = "";
             try
             {
                 rawData = _serialPort.ReadLine();
             }
-            catch
+            catch ( Exception except )
             {
+                Console.WriteLine( except.StackTrace );
                 return;
             }
 
-            Debug.Print( rawData );
-            double[] dblData = Array.ConvertAll(rawData.Split(';'), Double.Parse);
+            string[] data = rawData.Split(',');
 
-            _inputMap[eSensor.Hand] = new double[] { dblData[0], dblData[1], dblData[2] };
-            _inputMap[eSensor.Thumb_Proximal] = new double[] { dblData[3], dblData[4], dblData[5] };
-            _inputMap[eSensor.Thumb_Distal] = new double[] { dblData[6], dblData[7], dblData[8] };
-            _inputMap[eSensor.Index_Proximal] = new double[] { dblData[9], dblData[10], dblData[11] };
-            _inputMap[eSensor.Index_Middle] = new double[] { dblData[12], dblData[13], dblData[14] };
-            _inputMap[eSensor.Middle_Proximal] = new double[] { dblData[15], dblData[16], dblData[17] };
-            _inputMap[eSensor.Middle_Middle] = new double[] { dblData[18], dblData[19], dblData[20] };
+            eSensor sensor = (eSensor) data[0];
 
-            // Update calculations for each sensor
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
+            if ( ( data.Length == 4 ) && _sensorMap.ContainsKey( sensor ) )
+            {
+                data[3] = data[3].Remove( data[3].Length - 1, 1 ); // strip newline character
+
+                double raw_x = Convert.ToDouble(data[1]);
+                double raw_y = Convert.ToDouble(data[2]);
+                double raw_z = Convert.ToDouble(data[3]);
+
+                try
+                {
+                    _valueMap[sensor] = _sensorMap[sensor].getValue( new double[] { raw_x, raw_y, raw_z } );
+                }
+                catch (Exception except)
+                {
+                    Console.WriteLine( except.StackTrace );
+                    return;
+                }
+            }
         }
 
-        void _snapshotGlove( Object stateInfo )
-        {
-            string rawData;
-            try
-            {
-                rawData = _serialPort.ReadLine();
-
-            }
-            catch
-            {
-                return;
-            }
-
-            Debug.Print( rawData );
-            double[] dblData = Array.ConvertAll(rawData.Split(';'), Double.Parse);
-
-            _inputMap[eSensor.Hand] = new double[] { dblData[0], dblData[1], dblData[2] };
-            _inputMap[eSensor.Thumb_Proximal] = new double[] { dblData[3], dblData[4], dblData[5] };
-            _inputMap[eSensor.Thumb_Distal] = new double[] { dblData[6], dblData[7], dblData[8] };
-            _inputMap[eSensor.Index_Proximal] = new double[] { dblData[9], dblData[10], dblData[11] };
-            _inputMap[eSensor.Index_Middle] = new double[] { dblData[12], dblData[13], dblData[14] };
-            _inputMap[eSensor.Middle_Proximal] = new double[] { dblData[15], dblData[16], dblData[17] };
-            _inputMap[eSensor.Middle_Middle] = new double[] { dblData[18], dblData[19], dblData[20] };
-
-            // Update calculations for each sensor
-            foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                _valueMap[id] = _sensorMap[id].getValue( _inputMap[id] );
-        }
-
-        private bool _initialize( string portName, int baudRate, int dataBits, Handshake handshake, Parity parity, StopBits stopBits )
+        /// <summary>
+        /// (Re-)Initializes all parameters and data fields within the Translation Unit
+        /// </summary>
+        /// <param name="portName"> Serial port name </param>
+        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
+        /// <param name="dataBits"> Serial port data bits (default 8) </param>
+        /// <param name="handshake"> Serial port handshaking value (default None) </param>
+        /// <param name="parity"> Serial port parity value (default None) </param>
+        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
+        /// <returns> Initialization successful or not </returns>
+        private bool _initialize( string portName )
         {
             _initializeSensors();
             _gravityCompensator = new CGravityCompensator();
@@ -135,11 +186,11 @@ namespace TranslationUnit
             try
             {
                 _serialPort = new SerialPort( portName );
-                _serialPort.BaudRate = baudRate;
-                _serialPort.DataBits = dataBits;
-                _serialPort.Handshake = handshake;
-                _serialPort.Parity = parity;
-                _serialPort.StopBits = stopBits;
+                _serialPort.BaudRate = BAUDRATE;
+                _serialPort.DataBits = DATABITS;
+                _serialPort.Handshake = HANDSHAKE;
+                _serialPort.Parity = PARITY;
+                _serialPort.StopBits = STOPBITS;
                 _serialPort.DataReceived += new SerialDataReceivedEventHandler( _serialPort_DataReceivedHandler );
 
                 _serialPort.Open();
@@ -157,54 +208,38 @@ namespace TranslationUnit
 
         private void _initializeSensors()
         {
-            if ( _inputMap == null )
-                _inputMap = new Dictionary<eSensor, double[]>();
-
             if ( _valueMap == null )
                 _valueMap = new Dictionary<eSensor, double[]>();
 
             if ( _sensorMap == null )
                 _sensorMap = new Dictionary<eSensor, ISensor>();
 
-            _inputMap.Clear();
             _valueMap.Clear();
             _sensorMap.Clear();
-            
+
             try
             {
-                foreach ( eSensor id in Enum.GetValues( typeof( eSensor ) ) )
-                    _inputMap.Add( id, new double[] { 0.0, 0.0, 0.0 } );
+                foreach ( eSensor sensor in eSensor.values() )
+                    _valueMap.Add( sensor, new double[] { 0, 0, 0 } );
             }
             catch
             {
-                Debug.WriteLine( "Error initializing input values map." );
+                Debug.WriteLine( "Error initializing value map." );
             }
 
             try
             {
-                _sensorMap.Add( eSensor.Hand, new CKinematicSensor( null ) );
-                _sensorMap.Add( eSensor.Thumb_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-                _sensorMap.Add( eSensor.Thumb_Distal, new CKinematicSensor( _sensorMap[eSensor.Thumb_Proximal] ) );
-                _sensorMap.Add( eSensor.Index_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-                _sensorMap.Add( eSensor.Index_Middle, new CKinematicSensor( _sensorMap[eSensor.Index_Middle] ) );
-                _sensorMap.Add( eSensor.Middle_Proximal, new CKinematicSensor( _sensorMap[eSensor.Hand] ) );
-                _sensorMap.Add( eSensor.Middle_Middle, new CKinematicSensor( _sensorMap[eSensor.Middle_Middle] ) );
+                foreach ( eSensor sensor in eSensor.values() )
+                {
+                    if ( sensor.type() == eSensorType.Accelerometer )
+                        _sensorMap.Add( sensor, new CAccelerometer( sensor.value(), NORMALIZE_ACCEL ) );
+                    else if ( sensor.type() == eSensorType.Gyroscope )
+                        _sensorMap.Add( sensor, new CGyroscope( sensor.value(), NORMALIZE_GYRO ) );
+                }
             }
             catch
             {
                 Debug.WriteLine( "Error initializing sensor objects map." );
-            }
-
-            if ( _readTimer == null )
-            {
-                try
-                {
-                    _readTimer = new Timer( this._snapshotGlove, autoEvent, 500, 15 );
-                }
-                catch
-                {
-                    Debug.WriteLine( "Error initializing timer thread." );
-                }
             }
         }
     }
@@ -218,12 +253,12 @@ namespace TranslationUnit
             return;
         }
 
-        bool ITranslationUnit.initialize( string portName, int baudRate, int dataBits, Handshake handshake, Parity parity, StopBits stopBits )
+        bool ITranslationUnit.initialize( string portName )
         {
             return true;
         }
 
-        double[] ITranslationUnit.readSensor( int sensorID, bool debug, double x, double y, double z )
+        double[] ITranslationUnit.readSensor( eSensor sensorID, double x, double y, double z )
         {
             return new double[] { x, y, z };
         }

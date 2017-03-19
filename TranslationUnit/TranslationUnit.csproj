@@ -43,11 +43,14 @@
     <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CFIRFilter.cs" />
     <Compile Include="CGravityCompensator.cs" />
+    <Compile Include="CGyroscope.cs" />
     <Compile Include="CKalmanFilter.cs" />
-    <Compile Include="CKinematicSensor.cs" />
+    <Compile Include="CAccelerometer.cs" />
     <Compile Include="CTranslationUnit.cs" />
-    <Compile Include="IKalmanFilter.cs" />
+    <Compile Include="eSensor.cs" />
+    <Compile Include="IFilter.cs" />
     <Compile Include="ISensor.cs" />
     <Compile Include="ITranslationUnit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -4,52 +4,65 @@ using System.Drawing.Drawing2D;
 
 namespace TranslationUnit
 {
-    class CKalmanFilter : IKalmanFilter
+    /// <summary>
+    /// A basic Kalman Filter
+    /// </summary>
+    class CKalmanFilter : IFilter
     {
-        private struct KalmanState
+        double _x;      // value
+        double _dx;     // derivative
+        double _k1;     // kalman gain for value
+        double _k2;     // kalman gain for derivative
+        double _dt;     // time step
+
+        /// <summary>
+        /// Constructor for Kalman filter
+        /// </summary>
+        /// <param name="gain"> Kalman gain </param>
+        /// <param name="initState"> Initial value (default: 0) </param>
+        internal CKalmanFilter ( double k1, double k2 = 0, double dt = 0 )
         {
-            /** source: http://interactive-matter.eu/blog/2009/12/18/filtering-sensor-data-with-a-kalman-filter/ **/
+            _x = 0;
+            _dx = 0;
 
-            public double _q;    // process noise covariance
-            public double _r;    // measurement noise covariance
-            public double _x;    // value
-            public double _p;    // estimateion error covariance
-            public double _k;    // kalman gain
-
-            public KalmanState( double q = 0, double r = 0, double x = 0, double p = 0, double k = 0 )
-            {
-                _q = q;
-                _r = r;
-                _x = x;
-                _p = p;
-                _k = k;
-            }
-        };
-
-        KalmanState _state;
-
-        internal CKalmanFilter()
-        {
-            _state = new KalmanState();
+            _k1 = k1;
+            _k2 = k2;
+            _dt = dt;
         }
 
-        double IKalmanFilter.update( double input )
+        /// <summary>
+        /// Each output is the sum of the last input and a weighted difference between the last input and the current input
+        /// </summary>
+        public double[] filter( double input )
         {
-            //_state._p = _state._p + _state._q;
+            double x = _x;
+            double dx = _dx;
 
-            //_state._k = _state._p / ( _state._p + _state._r );
-            _state._x = _state._x + _state._k * ( input - _state._x );
-            //_state._p = ( 1 - _state._k ) * _state._p;
+            _x = x + _dt * dx + _k1 * ( input - x + _dt * dx );
+            _dx = dx + _k2 * ( input - x + _dt * dx );
 
-            return _state._x;
+            return new double[] { _x, _dx };
+        }
+
+        /// <summary>
+        /// Does no computation, simply returns the last calculated output value
+        /// </summary>
+        public double[] getState()
+        {
+            return new double[] { _x, _dx };
         }
     }
 
-    class MockKalmanFilter : IKalmanFilter
+    class MockKalmanFilter : IFilter
     {
-        double IKalmanFilter.update( double input )
+        public double[] filter( double input )
         {
-            return input;
+            return new double[] { input, 0 };
+        }
+
+        public double[] getState()
+        {
+            return new double[] { 0, 0 };
         }
     }
 }
