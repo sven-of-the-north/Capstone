@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO.Ports;
 using System.Threading;
+using UnityEngine;
 
 namespace TranslationUnit
 {
     /// <summary>
     /// Motor bitmasks
     /// </summary>
-    public enum eMotors
+    public enum eMotor : byte
     {
         none = 0,
         Motor7 = 2,
@@ -18,7 +18,8 @@ namespace TranslationUnit
         Motor4 = 16,
         Motor3 = 32,
         Motor2 = 64,
-        Motor1 = 128  
+        Motor1 = 128,
+        RESET = 89
     };
 
     /// <summary>
@@ -50,18 +51,27 @@ namespace TranslationUnit
     public class CTranslationUnit : ITranslationUnit
     {
         private const double NORMALIZE_ACCEL = 0.000061;
-        private const double NORMALIZE_GYRO = 0.00875;
+        private const double NORMALIZE_GYRO = 0.010986328;
 
-        private const int BAUDRATE = 115200;
+        private const int BAUDRATE = 38400;
         private const int DATABITS = 8;
         private const Handshake HANDSHAKE = Handshake.None;
         private const Parity PARITY = Parity.None;
         private const StopBits STOPBITS = StopBits.One;
+        private string PORTNAME = "COM4";
 
-        private Dictionary<eSensor, double[]> _valueMap;
+        private bool DEBUG_UNITY = true;
+
+        private volatile Dictionary<eSensor, float[]> _valueMap;
         private Dictionary<eSensor, ISensor> _sensorMap;
         private SerialPort _serialPort;
-        private CGravityCompensator _gravityCompensator;
+
+        Thread _brakeThread = null;
+        private volatile byte[] _motorCommand = { (byte)eMotor.none };
+        private volatile bool _brakeThreadFlag = false;
+
+        Thread _readThread = null;
+        private volatile bool _readThreadFlag = false;
 
         /// <summary>
         /// Constructor for a Translation Unit object
@@ -74,10 +84,9 @@ namespace TranslationUnit
         /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
         public CTranslationUnit( string portName )
         {
-            if ( !_initialize( portName ) )
-                throw new InvalidSerialPortException( "Could not open serial port for communication." );
+            PORTNAME = portName;
         }
-
+        
         /// <summary>
         /// Translation Unit destructor
         /// </summary>
@@ -85,7 +94,23 @@ namespace TranslationUnit
         {
             _sensorMap.Clear();
             _valueMap.Clear();
-            _serialPort.Dispose();
+
+            if ( _serialPort != null )
+            {
+                _serialPort.Close();
+                _serialPort.Dispose();
+            }
+
+            if ( _brakeThread != null )
+                stopBrakeThread();
+
+            if ( _readThread != null )
+                stopReadThread();
+
+            if ( DEBUG_UNITY )
+                Debug.Log( "TranslationUnit cleaned up!" );
+            else
+                System.Diagnostics.Debug.WriteLine( "TranslationUnit cleaned up!" );
         }
 
         /// <summary>
@@ -96,7 +121,7 @@ namespace TranslationUnit
         /// <param name="y"> ignored </param>
         /// <param name="z"> ignored </param>
         /// <returns> [x, y, z] values read from the specified sensor </returns>
-        double[] ITranslationUnit.readSensor( eSensor sensorID, double x, double y, double z )
+        public float[] readSensor( eSensor sensorID, float x, float y, float z )
         {
             return _valueMap[sensorID];
         }
@@ -105,111 +130,151 @@ namespace TranslationUnit
         /// Activates the brake specified by brakeID
         /// </summary>
         /// <param name="brakeID"> Brake to activate </param>
-        /// <param name="brakeValue"> ignored (always 1) </param>
-        void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
+        public void applyBrake( eMotor brakeID )
         {
-            throw new NotImplementedException();
+            _motorCommand[0] |= ( byte )brakeID;
+        }
+
+        /// <summary>
+        /// Releases the brake specified by brakeID
+        /// </summary>
+        /// <param name="brakeID"> Brake to deactivate </param>
+        public void releaseBrake( eMotor brakeID )
+        {
+            _motorCommand[0] &= ( byte )( 255 ^ ( byte )brakeID );
+        }
+
+        public bool serialStatus()
+        {
+            return _serialPort.IsOpen;
+        }
+
+        public bool brakeThreadStatus()
+        {
+            return _brakeThread.IsAlive;
+        }
+
+        public bool readThreadStatus()
+        {
+            return _readThread.IsAlive;
+        }
+
+        public bool startBrakeThread()
+        {
+            if ( _brakeThread != null )
+            {
+                if ( _brakeThread.IsAlive )
+                {
+                    if ( stopBrakeThread() ) 
+                        _brakeThread = null;
+                    else
+                        return false;
+                }
+                else
+                {
+                    _brakeThread = null;
+                }
+            }
+
+            _brakeThread = new Thread( new ThreadStart( writeBrakeState ) );
+            _brakeThread.IsBackground = true;
+            _brakeThreadFlag = true;
+            _brakeThread.Start();
+
+            return _brakeThread.IsAlive;
+        }
+
+        public bool stopBrakeThread()
+        {
+            if ( _brakeThread == null )
+                return true;
+
+            if ( _brakeThread.IsAlive )
+            {
+                _brakeThreadFlag = false;
+                _brakeThread.Join();
+            }
+
+            return !_brakeThread.IsAlive;
+        }
+
+        public bool startReadThread()
+        {
+            if ( _readThread != null )
+            {
+                if ( _readThread.IsAlive )
+                {
+                    if ( stopReadThread() )
+                        _readThread = null;
+                    else
+                        return false;
+                }
+                else
+                {
+                    _readThread = null;
+                }
+            }
+
+            _readThread = new Thread( new ThreadStart( readFromSensors ) );
+            _readThread.IsBackground = true;
+            _readThreadFlag = true;
+            _readThread.Start();
+
+            return _readThread.IsAlive;
+        }
+
+        public bool stopReadThread()
+        {
+            if ( _readThread == null )
+                return true;
+
+            if ( _readThread.IsAlive )
+            {
+                _readThreadFlag = false;
+                _readThread.Join();
+            }
+
+            return !_readThread.IsAlive;
         }
 
         /// <summary>
         /// (Re-)Initializes all parameters and data fields within the Translation Unit
         /// </summary>
         /// <param name="portName"> Serial port name </param>
-        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
-        /// <param name="dataBits"> Serial port data bits (default 8) </param>
-        /// <param name="handshake"> Serial port handshaking value (default None) </param>
-        /// <param name="parity"> Serial port parity value (default None) </param>
-        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
         /// <returns> Initialization successful or not </returns>
-        bool ITranslationUnit.initialize( string portName )
+        public bool initialize()
         {
-            return _initialize( portName );
-        }
-
-        /// <summary>
-        /// Handler for receiving serial data objects
-        /// </summary>
-        /// <param name="sender"> ignored </param>
-        /// <param name="e"> ignored </param>
-        void _serialPort_DataReceivedHandler( object sender, SerialDataReceivedEventArgs e )
-        {
-            string rawData = "";
-            try
+            if ( _serialPort != null )
             {
-                rawData = _serialPort.ReadLine();
-            }
-            catch ( Exception except )
-            {
-                Console.WriteLine( except.StackTrace );
-                return;
+                _serialPort.Close();
+                _serialPort.Dispose();
+                _serialPort = null;
             }
 
-            string[] data = rawData.Split(',');
-
-            eSensor sensor = (eSensor) data[0];
-
-            if ( ( data.Length == 4 ) && _sensorMap.ContainsKey( sensor ) )
+            if ( _brakeThread != null )
             {
-                data[3] = data[3].Remove( data[3].Length - 1, 1 ); // strip newline character
-
-                double raw_x = Convert.ToDouble(data[1]);
-                double raw_y = Convert.ToDouble(data[2]);
-                double raw_z = Convert.ToDouble(data[3]);
-
-                try
-                {
-                    _valueMap[sensor] = _sensorMap[sensor].getValue( new double[] { raw_x, raw_y, raw_z } );
-                }
-                catch (Exception except)
-                {
-                    Console.WriteLine( except.StackTrace );
-                    return;
-                }
-            }
-        }
-
-        /// <summary>
-        /// (Re-)Initializes all parameters and data fields within the Translation Unit
-        /// </summary>
-        /// <param name="portName"> Serial port name </param>
-        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
-        /// <param name="dataBits"> Serial port data bits (default 8) </param>
-        /// <param name="handshake"> Serial port handshaking value (default None) </param>
-        /// <param name="parity"> Serial port parity value (default None) </param>
-        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
-        /// <returns> Initialization successful or not </returns>
-        private bool _initialize( string portName )
-        {
-            _initializeSensors();
-            _gravityCompensator = new CGravityCompensator();
-
-            try
-            {
-                _serialPort = new SerialPort( portName );
-                _serialPort.BaudRate = BAUDRATE;
-                _serialPort.DataBits = DATABITS;
-                _serialPort.Handshake = HANDSHAKE;
-                _serialPort.Parity = PARITY;
-                _serialPort.StopBits = STOPBITS;
-                _serialPort.DataReceived += new SerialDataReceivedEventHandler( _serialPort_DataReceivedHandler );
-
-                _serialPort.Open();
-
-                if ( !_serialPort.IsOpen )
+                if ( !stopBrakeThread() )
                     return false;
             }
-            catch
+
+            if ( _readThread != null )
             {
-                return false;
+                if ( !stopReadThread() )
+                    return false;
             }
 
-            return true;
+            _initializeSensors();
+
+            return _initializeSerial();
         }
 
+        /// <summary>
+        /// Initializes data fields and sensor objects
+        /// </summary>
         private void _initializeSensors()
         {
             if ( _valueMap == null )
-                _valueMap = new Dictionary<eSensor, double[]>();
+                _valueMap = new Dictionary<eSensor, float[]>();
 
             if ( _sensorMap == null )
                 _sensorMap = new Dictionary<eSensor, ISensor>();
@@ -220,47 +285,318 @@ namespace TranslationUnit
             try
             {
                 foreach ( eSensor sensor in eSensor.values() )
-                    _valueMap.Add( sensor, new double[] { 0, 0, 0 } );
+                   _valueMap.Add( sensor, new float[] { -1, -1, -1 } );
             }
             catch
             {
-                Debug.WriteLine( "Error initializing value map." );
+                if ( DEBUG_UNITY )
+                    Debug.Log( "Error initializing value map." );
+                else
+                    System.Diagnostics.Debug.WriteLine( "Error initializing value map." );
             }
 
             try
             {
+                
                 foreach ( eSensor sensor in eSensor.values() )
                 {
                     if ( sensor.type() == eSensorType.Accelerometer )
-                        _sensorMap.Add( sensor, new CAccelerometer( sensor.value(), NORMALIZE_ACCEL ) );
+                        _sensorMap.Add( sensor, new CAccelerometer( ( string )sensor, NORMALIZE_ACCEL ) );
                     else if ( sensor.type() == eSensorType.Gyroscope )
-                        _sensorMap.Add( sensor, new CGyroscope( sensor.value(), NORMALIZE_GYRO ) );
+                        _sensorMap.Add( sensor, new CGyroscope( ( string )sensor, NORMALIZE_GYRO ) );
                 }
             }
             catch
             {
-                Debug.WriteLine( "Error initializing sensor objects map." );
+                if ( DEBUG_UNITY )
+                    Debug.Log( "Error initializing sensor objects map." );
+                else
+                    System.Diagnostics.Debug.WriteLine( "Error initializing sensor objects map." );
             }
         }
+
+        private bool _initializeSerial()
+        {
+            try
+            {
+                _serialPort = new SerialPort( PORTNAME );
+                _serialPort.BaudRate = BAUDRATE;
+                _serialPort.DataBits = DATABITS;
+                _serialPort.Handshake = HANDSHAKE;
+                _serialPort.Parity = PARITY;
+                _serialPort.StopBits = STOPBITS;
+                _serialPort.WriteTimeout = 100;
+                //_serialPort.DataReceived += new SerialDataReceivedEventHandler( _serialPort_DataReceivedHandler );
+
+                _serialPort.Open();
+
+                if ( !_serialPort.IsOpen )
+                    return false;
+            }
+            catch ( Exception except )
+            {
+                if ( DEBUG_UNITY )
+                {
+                    Debug.Log( "Error: \n" + except.Message );
+                    Debug.Log( "Stacktrace: \n" + except.StackTrace );
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine( "Error: \n" + except.Message );
+                    System.Diagnostics.Debug.WriteLine( "Stacktrace: \n" + except.StackTrace );
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Writes the current brake state to the serial port
+        /// </summary>
+        private void writeBrakeState()
+        {
+            while ( _brakeThreadFlag )
+            {
+                if ( _serialPort.IsOpen )
+                {
+                    try
+                    {
+                        _serialPort.Write( _motorCommand, 0, 1 );
+                    }
+                    catch ( Exception except )
+                    {
+                        if ( DEBUG_UNITY )
+                            Debug.Log( except.StackTrace );
+                        else
+                            System.Diagnostics.Debug.WriteLine( except.StackTrace );
+                    }
+                }
+
+                Thread.Sleep( 16 );
+            }
+        }
+
+        /// <summary>
+        /// Polls the serial port, trying to get data
+        /// </summary>
+        private void readFromSensors()
+        {
+            string rawData = "";
+            string[] data = { };
+            eSensor sensor = null;
+
+            while ( _readThreadFlag )
+            {
+                try
+                {
+                    rawData = _serialPort.ReadLine();
+                    data = rawData.Split( ',' );
+                    sensor = ( eSensor )data[0];
+                }
+                catch ( InvalidCastException )
+                {
+                    //This is going to happen a lot
+                    continue;
+                }
+                catch ( Exception except )
+                {
+                    if ( DEBUG_UNITY )
+                        Debug.Log( except.StackTrace );
+                    else
+                        System.Diagnostics.Debug.WriteLine( except.StackTrace );
+
+                    continue;
+                }
+
+                if ( ( data.Length == 4 ) && _sensorMap.ContainsKey( sensor ) )
+                {
+                    try
+                    {
+                        data[3] = data[3].Remove( data[3].Length - 1, 1 ); // strip newline character
+
+                        double raw_x = Convert.ToDouble(data[1]);
+                        double raw_y = Convert.ToDouble(data[2]);
+                        double raw_z = Convert.ToDouble(data[3]);
+
+                        double[] processed = _sensorMap[sensor].getValue( new double[] { raw_x, raw_y, raw_z } );
+
+                        _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+                    }
+                    catch ( FormatException )
+                    {
+                        //This is going to happen a lot
+                        continue;
+                    }
+                    catch ( Exception except )
+                    {
+                        if ( DEBUG_UNITY )
+                            Debug.Log( except.StackTrace );
+                        else
+                            System.Diagnostics.Debug.WriteLine( except.StackTrace );
+
+                        continue;
+                    }
+                }
+
+                Thread.Sleep( 16 );
+            }
+        }
+
+        /*
+        /// <summary>
+        /// Handler for receiving serial data objects. THIS DOESNT WORK IN UNITY
+        /// </summary>
+        /// <param name="sender"> ignored </param>
+        /// <param name="e"> ignored </param>
+        private void _serialPort_DataReceivedHandler( object sender, SerialDataReceivedEventArgs e )
+        {
+            Debug.Log( "Handling data received event" );
+
+            string rawData = "";
+            string[] data = { };
+            eSensor sensor = null;
+
+            try
+            {
+                rawData = _serialPort.ReadLine();
+                data = rawData.Split( ',' );
+                sensor = ( eSensor )data[0];
+
+                Debug.Log( "Read from sensor" );
+            }
+            catch ( InvalidCastException )
+            {
+                //This is going to happen a lot
+                return;
+            }
+            catch ( Exception except )
+            {
+                if ( DEBUG_UNITY )
+                    Debug.Log( except.StackTrace );
+                else
+                    System.Diagnostics.Debug.WriteLine( except.StackTrace );
+
+                return;
+            }
+
+            if ( ( data.Length == 4 ) && _sensorMap.ContainsKey( sensor ) )
+            {
+                try
+                {
+                    Debug.Log( "Read good data" );
+
+                    data[3] = data[3].Remove( data[3].Length - 1, 1 ); // strip newline character
+
+                    double raw_x = Convert.ToDouble(data[1]);
+                    double raw_y = Convert.ToDouble(data[2]);
+                    double raw_z = Convert.ToDouble(data[3]);
+
+                    double[] processed = _sensorMap[sensor].getValue( new double[] { raw_x, raw_y, raw_z } );
+
+                    _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+                    Debug.Log( "Wrote good data" );
+                }
+                catch ( FormatException )
+                {
+                    //This is going to happen a lot
+                    return;
+                }
+                catch ( Exception except )
+                {
+                    if ( DEBUG_UNITY )
+                        Debug.Log( except.StackTrace );
+                    else
+                        System.Diagnostics.Debug.WriteLine( except.StackTrace );
+
+                    return;
+                }
+            }
+        }
+        */
     }
 
     public class MockTranslationUnit : ITranslationUnit
     {
+        bool _readThreadState = false;
+        bool _writeThreadState = false;
+
         public MockTranslationUnit(){}
 
-        void ITranslationUnit.applyBrake( int brakeID, double brakeValue )
+        public void applyBrake( eMotor brakeID )
         {
             return;
         }
 
-        bool ITranslationUnit.initialize( string portName )
+        public void releaseBrake( eMotor brakeID )
+        {
+            return;
+        }
+
+        public bool startBrakeThread()
+        {
+            if ( !_writeThreadState )
+                _writeThreadState = true;
+            else
+                _writeThreadState = false;
+
+            return _writeThreadState;
+        }
+
+        public bool stopBrakeThread()
+        {
+            if ( _writeThreadState )
+                _writeThreadState = false;
+            else
+                _writeThreadState = true;
+
+            return _writeThreadState;
+        }
+
+        public bool startReadThread()
+        {
+            if ( !_readThreadState )
+                _readThreadState = true;
+            else
+                _readThreadState = false;
+
+            return _readThreadState;
+        }
+
+        public bool stopReadThread()
+        {
+            if ( _readThreadState )
+                _readThreadState = false;
+            else
+                _readThreadState = true;
+
+            return _readThreadState;
+        }
+
+        public bool initialize()
         {
             return true;
         }
 
-        double[] ITranslationUnit.readSensor( eSensor sensorID, double x, double y, double z )
+        public bool serialStatus()
         {
-            return new double[] { x, y, z };
+            return true;
+        }
+
+        public bool brakeThreadStatus()
+        {
+            return _writeThreadState;
+        }
+
+        public bool readThreadStatus()
+        {
+            return _readThreadState;
+        }
+
+        public float[] readSensor( eSensor sensorID, float x, float y, float z )
+        {
+            return new float[] { x, y, z };
         }
     }
 }

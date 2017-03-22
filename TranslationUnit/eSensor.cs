@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TranslationUnit
 {
@@ -11,33 +8,31 @@ namespace TranslationUnit
     /// </summary>
     public sealed class eSensor
     {
-        private readonly String _name;
-        private readonly String _value;
-        private readonly eSensorType _type;
-        private static readonly Dictionary<string, eSensor> _instance = new Dictionary<string,eSensor>();
+        private readonly string _name;
+        private static readonly Dictionary<string, eSensor> _name_to_value = new Dictionary<string,eSensor>();
+        private static readonly Dictionary<eSensor, string> _value_to_name = new Dictionary<eSensor,string>();
 
-        public static readonly eSensor Hand_Accel    = new eSensor( "Hand_Accel" , "a0", eSensorType.Accelerometer );
-        public static readonly eSensor Hand_Gyro     = new eSensor( "Hand_Gyro" , "g0", eSensorType.Gyroscope );
-        public static readonly eSensor Thumb_Prox    = new eSensor( "Thumb_Prox" , "g1", eSensorType.Gyroscope );
-        public static readonly eSensor Thumb_Dist    = new eSensor( "Thumb_Dist" , "g2", eSensorType.Gyroscope );
-        public static readonly eSensor Index_Prox    = new eSensor( "Index_Prox" , "g3", eSensorType.Gyroscope );
-        public static readonly eSensor Index_Dist    = new eSensor( "Index_Dist" , "g4", eSensorType.Gyroscope );
-        public static readonly eSensor Middle_Prox   = new eSensor( "Middle_Prox" , "g5", eSensorType.Gyroscope );
-        public static readonly eSensor Middle_Dist   = new eSensor( "Middle_Dist" , "g6", eSensorType.Gyroscope );
-        public static readonly eSensor Thumb_Prox_a  = new eSensor( "Thumb_Prox_a" , "a1", eSensorType.Accelerometer );
-        public static readonly eSensor Thumb_Dist_a  = new eSensor( "Thumb_Dist_a" , "a2", eSensorType.Accelerometer );
-        public static readonly eSensor Index_Prox_a  = new eSensor( "Index_Prox_a" , "a3", eSensorType.Accelerometer );
-        public static readonly eSensor Index_Dist_a  = new eSensor( "Index_Dist_a" , "a4", eSensorType.Accelerometer );
-        public static readonly eSensor Middle_Prox_a = new eSensor( "Middle_Prox_a" , "a5", eSensorType.Accelerometer );
-        public static readonly eSensor Middle_Dist_a = new eSensor( "Middle_Dist_a" , "a6", eSensorType.Accelerometer );
+        public static readonly eSensor Hand_Accel    = new eSensor( "a0" );
+        public static readonly eSensor Hand_Gyro     = new eSensor( "g0" );
+        public static readonly eSensor Thumb_Prox    = new eSensor( "g1" );
+        public static readonly eSensor Thumb_Dist    = new eSensor( "g2" );
+        public static readonly eSensor Index_Prox    = new eSensor( "g3" );
+        public static readonly eSensor Index_Dist    = new eSensor( "g4" );
+        public static readonly eSensor Middle_Prox   = new eSensor( "g5" );
+        public static readonly eSensor Middle_Dist   = new eSensor( "g6" );
+/*        public static readonly eSensor Thumb_Prox_a  = new eSensor( "a1" );
+        public static readonly eSensor Thumb_Dist_a  = new eSensor( "a2" );
+        public static readonly eSensor Index_Prox_a  = new eSensor( "a3" );
+        public static readonly eSensor Index_Dist_a  = new eSensor( "a4" );
+        public static readonly eSensor Middle_Prox_a = new eSensor( "a5" );
+        public static readonly eSensor Middle_Dist_a = new eSensor( "a6" );*/
 
-        private eSensor( string name, string value, eSensorType type )
+        private eSensor( string name )
         {
             _name = name;
-            _value = value;
-            _type = type;
 
-            _instance[name] = this;
+            _name_to_value[name] = this;
+            _value_to_name[this] = name;
         }
 
         public override string ToString()
@@ -45,25 +40,37 @@ namespace TranslationUnit
             return _name;
         }
 
-        public string value()
-        { 
-            return _value;
-        }
-
         public eSensorType type()
         {
-            return _type;
+            switch ( _name[0] )
+            {
+                case 'a':
+                    return eSensorType.Accelerometer;
+                case 'g':
+                    return eSensorType.Gyroscope;
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         public static List<string> values()
         {
-            return _instance.Keys.ToList<string>();
+            return new List<string>( _name_to_value.Keys );
         }
         
         public static explicit operator eSensor( string str )
         {
             eSensor result;
-            if ( _instance.TryGetValue( str, out result ) )
+            if ( _name_to_value.TryGetValue( str, out result ) )
+                return result;
+            else
+                throw new InvalidCastException();
+        }
+
+        public static explicit operator string( eSensor sensor )
+        {
+            string result;
+            if ( _value_to_name.TryGetValue( sensor, out result ) )
                 return result;
             else
                 throw new InvalidCastException();

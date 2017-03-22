@@ -26,7 +26,7 @@ namespace TranslationUnit
     }
 
     /// <summary>
-    /// An accelerometer or gyroscope with 6 degrees of freedom (3 for accelerometer, 3 for gyroscope)
+    /// A 3-axis accelerometer
     /// </summary>
     class CAccelerometer : ISensor
     {
@@ -53,18 +53,17 @@ namespace TranslationUnit
         private double _z = Double.NegativeInfinity;
 
         /// <summary>
-        /// Constructor for a kinematic sensor
+        /// Constructor
         /// </summary>
         /// <param name="id"> Name </param>
-        /// <param name="sensorType"> Sensor type (accelerometer or gyroscope) </param>
         /// <param name="normalizer"> Normalization coefficient </param>
         /// <param name="nextSensor"> Next sensor (if any) </param>
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
         internal CAccelerometer( string id, double normalizer, ISensor nextSensor = null, double deltaT = (double)1/60 )
         {
-            _xFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.6197 ) };
-            _yFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.7164 ) };
-            _zFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9154 ) };
+            _xFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9937 ) };
+            _yFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9880 ) };
+            _zFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9998 ) };
 
             _integrator = new Integrator();
 
@@ -78,12 +77,12 @@ namespace TranslationUnit
 
         /// <summary>
         /// All input values are run through their own set of stateful filters that can be defined in the constructor for this class.
-        /// If this sensor is an accelerometer, an extra integration step is also taken before values are returned to provide instantaneous velocity.
+        /// Integration is performed to produce instantaneous velocity.
         /// </summary>
         public double[] getValue( double[] input )
         {
             if ( input.Length != 3 )
-                throw new ArgumentException( string.Format( "Input array to '{0}' was invalid: {1}", _id, String.Join( ", ", input ) ) );
+                throw new ArgumentException( string.Format( "Input array to '{0}' was invalid: {1}", _id, String.Join( ", ", Array.ConvertAll<double, String>( input, Convert.ToString ) ) ) );
 
             double x = input[0];
             double y = input[1];
@@ -127,14 +126,14 @@ namespace TranslationUnit
         }
     }
 
-    class MockKinematicSensor : ISensor
+    class MockAccelerometer : ISensor
     {
-        double[] ISensor.getState()
+        public double[] getState()
         {
             return new double[] { 0, 0, 0 };
         }
 
-        double[] ISensor.getValue( double[] input )
+        public double[] getValue( double[] input )
         {
             return input;
         }
