@@ -79,11 +79,8 @@ namespace TranslationUnit
         /// All input values are run through their own set of stateful filters that can be defined in the constructor for this class.
         /// Integration is performed to produce instantaneous velocity.
         /// </summary>
-        public double[] getValue( double[] input )
+        public double[] getValue( int[] input )
         {
-            if ( input.Length != 3 )
-                throw new ArgumentException( string.Format( "Input array to '{0}' was invalid: {1}", _id, String.Join( ", ", Array.ConvertAll<double, String>( input, Convert.ToString ) ) ) );
-
             double x = input[0];
             double y = input[1];
             double z = input[2];
@@ -133,9 +130,9 @@ namespace TranslationUnit
             return new double[] { 0, 0, 0 };
         }
 
-        public double[] getValue( double[] input )
+        public double[] getValue( int[] input )
         {
-            return input;
+            return new double[] { input[0], input[1], input[2] };
         }
     }
 }

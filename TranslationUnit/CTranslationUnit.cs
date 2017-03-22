@@ -383,48 +383,33 @@ namespace TranslationUnit
         /// </summary>
         private void readFromSensors()
         {
-            string rawData = "";
-            string[] data = { };
+            const int newLine = 10;
+            int readByte = 0;
+            int bytesRead = -1;
+            byte[] readBytes = new byte[7];
             eSensor sensor = null;
 
             while ( _readThreadFlag )
             {
-                try
-                {
-                    rawData = _serialPort.ReadLine();
-                    data = rawData.Split( ',' );
-                    sensor = ( eSensor )data[0];
-                }
-                catch ( InvalidCastException )
-                {
-                    //This is going to happen a lot
-                    continue;
-                }
-                catch ( Exception except )
-                {
-                    if ( DEBUG_UNITY )
-                        Debug.Log( except.StackTrace );
-                    else
-                        System.Diagnostics.Debug.WriteLine( except.StackTrace );
-
-                    continue;
-                }
-
-                if ( ( data.Length == 4 ) && _sensorMap.ContainsKey( sensor ) )
+                for ( int i = 0; i < 8; ++i )
                 {
                     try
                     {
-                        data[3] = data[3].Remove( data[3].Length - 1, 1 ); // strip newline character
-
-                        double raw_x = Convert.ToDouble(data[1]);
-                        double raw_y = Convert.ToDouble(data[2]);
-                        double raw_z = Convert.ToDouble(data[3]);
-
-                        double[] processed = _sensorMap[sensor].getValue( new double[] { raw_x, raw_y, raw_z } );
-
-                        _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+                        readByte = _serialPort.ReadByte();
+                        if ( ( readByte ^ newLine ) != 0 )
+                            break;
                     }
-                    catch ( FormatException )
+                    catch ( Exception )
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        bytesRead = _serialPort.Read( readBytes, 0, 7 );
+                        sensor = ( eSensor )readBytes[0];
+                    }
+                    catch ( InvalidCastException )
                     {
                         //This is going to happen a lot
                         continue;
@@ -438,9 +423,37 @@ namespace TranslationUnit
 
                         continue;
                     }
+
+                    if ( ( bytesRead == 7 ) && _sensorMap.ContainsKey( sensor ) )
+                    {
+                        try
+                        {
+                            int raw_x = BitConverter.ToInt16( readBytes, 1 );
+                            int raw_y = BitConverter.ToInt16( readBytes, 3 );
+                            int raw_z = BitConverter.ToInt16( readBytes, 5 );
+
+                            double[] processed = _sensorMap[sensor].getValue( new int[] { raw_x, raw_y, raw_z } );
+
+                            _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+                        }
+                        catch ( FormatException )
+                        {
+                            //This is going to happen a lot
+                            continue;
+                        }
+                        catch ( Exception except )
+                        {
+                            if ( DEBUG_UNITY )
+                                Debug.Log( except.StackTrace );
+                            else
+                                System.Diagnostics.Debug.WriteLine( except.StackTrace );
+
+                            continue;
+                        }
+                    }
                 }
 
-                Thread.Sleep( 16 );
+                Thread.Sleep( 5 );
             }
         }
 

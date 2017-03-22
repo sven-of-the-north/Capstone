@@ -9,6 +9,8 @@ namespace TranslationUnit
     {
         private static readonly int FIR_ORDER_GYRO = 9;
         private static readonly double[] FIR_COEFF_GYRO = { -0.1896, 0.1332, -0.0877, 0.2782, 0.5444, 0.2782, -0.0877, 0.1332, -0.1896 };
+        private static readonly double KALMAN_GAIN_1 = 0.2138;
+        private static readonly double KALMAN_GAIN_2 = 1.5357;
 
         private static readonly double PROBABILITY_FACTOR = 0.99;
 
@@ -48,13 +50,13 @@ namespace TranslationUnit
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
         internal CGyroscope( string id, double normalizer, ISensor nextSensor = null, double deltaT = ( double )1 / 60 )
         {
-            _xFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
-            _yFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
-            _zFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
-
-            _xFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
-            _yFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
-            _zFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( 0.2138, 1.5357, deltaT ) };
+            _xFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _yFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _zFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+                                                                                                                   
+            _xFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _yFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _zFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
 
             _id = id;
             _nextSensor = nextSensor;
@@ -66,7 +68,7 @@ namespace TranslationUnit
         /// The gyroscope signal flips back and forth between two distinct values, the larger of which is typically correct. Therefore it is necessary
         /// that we treat each value as a separate signal.
         /// </summary>
-        private double estimate( ref double small, ref double large, IFilter[] filters_small, IFilter[] filters_large, double input )
+        private double estimate( ref double small, ref double large, IFilter[] filters_small, IFilter[] filters_large, int input )
         {
             double x_large = 0;
             double x_small = 0;
@@ -109,7 +111,7 @@ namespace TranslationUnit
         /// <summary>
         /// All input values are run through their own set of stateful filters that can be defined in the constructor for this class.
         /// </summary>
-        public double[] getValue( double[] input )
+        public double[] getValue( int[] input )
         {
             _x = estimate( ref _x_small, ref _x_large, _xFilters_small, _xFilters_large, input[0]) * _normalizer;
             _y = estimate( ref _y_small, ref _y_large, _yFilters_small, _yFilters_large, input[1]) * _normalizer;
@@ -134,9 +136,9 @@ namespace TranslationUnit
             return new double[] { 0, 0, 0 };
         }
 
-        public double[] getValue( double[] input )
+        public double[] getValue( int[] input )
         {
-            return input;
+            return new double[] { input[0], input[1], input[2] };
         }
     }
 }

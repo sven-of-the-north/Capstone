@@ -7,7 +7,7 @@
         /// </summary>
         /// <param name="input"> Raw [x, y, z] values </param>
         /// <returns> Calculated [x, y, z] values </returns>
-        double[] getValue( double[] input );
+        double[] getValue( int[] input );
 
         /// <summary>
         /// Does no computation, simply returns the last calculated output values
