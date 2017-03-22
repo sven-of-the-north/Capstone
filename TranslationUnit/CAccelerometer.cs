@@ -12,7 +12,7 @@ namespace TranslationUnit
         {
             _velocity = 0;
             _prevAccel = 0;
-            _deltaT = deltaT <= 0 ? ( double )1 / 60 : deltaT;
+            _deltaT = deltaT;
         }
 
         internal double integrate( double input )
@@ -30,9 +30,10 @@ namespace TranslationUnit
     /// </summary>
     class CAccelerometer : ISensor
     {
-        private static readonly int FIR_ORDER_ACCEL = 4;
+        private static readonly double[] FIR_COEFF_ACCEL = { -0.0210, -0.0160, -0.0206, -0.0256, -0.0301, -0.0341, -0.0371, -0.0391,  0.9603, -0.0391, -0.0371, -0.0341, -0.0301   ,-0.0256   ,-0.0206   ,-0.0160   ,-0.0210 };
+        private static readonly double KALMAN_GAIN = 0.5;
 
-        private static readonly double[] FIR_COEFF_ACCEL = { 0.0000, 0.2782, 0.4437, 0.2782 };
+        private static readonly double[] FIR_COEFF_ACCEL_POST = { -0.1896, 0.1332, -0.0877, 0.2782, 0.5444, 0.2782, -0.0877, 0.1332, -0.1896 };
 
         // Used for integration of accelerometer values
         private Integrator _integrator;
@@ -48,6 +49,10 @@ namespace TranslationUnit
         private IFilter[] _yFilters;
         private IFilter[] _zFilters;
 
+        private IFilter[] _xFilters_post;
+        private IFilter[] _yFilters_post;
+        private IFilter[] _zFilters_post;
+
         private double _x = Double.NegativeInfinity;
         private double _y = Double.NegativeInfinity;
         private double _z = Double.NegativeInfinity;
@@ -61,9 +66,13 @@ namespace TranslationUnit
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
         internal CAccelerometer( string id, double normalizer, ISensor nextSensor = null, double deltaT = (double)1/60 )
         {
-            _xFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9937 ) };
-            _yFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9880 ) };
-            _zFilters = new IFilter[] { new CFIRFilter( FIR_ORDER_ACCEL, FIR_COEFF_ACCEL ), new CKalmanFilter( 0.9998 ) };
+            _xFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ), new CKalmanFilter( KALMAN_GAIN ) };
+            _yFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ), new CKalmanFilter( KALMAN_GAIN ) };
+            _zFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ), new CKalmanFilter( KALMAN_GAIN ) };
+
+            _xFilters_post = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL_POST ) };
+            _yFilters_post = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL_POST ) };
+            _zFilters_post = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL_POST ) };
 
             _integrator = new Integrator();
 
@@ -99,6 +108,15 @@ namespace TranslationUnit
                 x = _integrator.integrate( x );
                 y = _integrator.integrate( y );
                 z = _integrator.integrate( z );
+
+                for ( int i = 0; i < _xFilters_post.Length; ++i )
+                    x = _xFilters_post[i].filter( x )[0];
+
+                for ( int i = 0; i < _yFilters_post.Length; ++i )
+                    y = _yFilters_post[i].filter( y )[0];
+
+                for ( int i = 0; i < _zFilters_post.Length; ++i )
+                    z = _zFilters_post[i].filter( z )[0];
             }
             catch (Exception e)
             {

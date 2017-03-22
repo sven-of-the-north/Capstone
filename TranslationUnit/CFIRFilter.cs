@@ -17,12 +17,12 @@ namespace TranslationUnit
         /// </summary>
         /// <param name="order"> Order of this filter </param>
         /// <param name="coefficients"> Coefficients for computation </param>
-        internal CFIRFilter( int order, double[] coefficients )
+        internal CFIRFilter( double[] coefficients )
         {
             _sum = 0;
-            _order = order;
+            _order = coefficients.Length;
             _coefficients = coefficients;
-            _inputs = new double[order];
+            _inputs = new double[_order];
         }
 
         /// <summary>
@@ -52,14 +52,19 @@ namespace TranslationUnit
 
     class MockFIRFilter : IFilter
     {
+        double value = double.NegativeInfinity;
+
+        public MockFIRFilter( double[] coefficients ) {}
+
         public double[] filter( double input )
         {
+            value = input;
             return new double[] { input, 0 };
         }
 
         public double[] getState()
         {
-            return new double[] { 0, 0 };
+            return new double[] { value, 0 };
         }
     }
 }

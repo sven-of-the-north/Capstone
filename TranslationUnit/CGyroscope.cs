@@ -7,7 +7,6 @@ namespace TranslationUnit
     /// </summary>
     class CGyroscope : ISensor
     {
-        private static readonly int FIR_ORDER_GYRO = 9;
         private static readonly double[] FIR_COEFF_GYRO = { -0.1896, 0.1332, -0.0877, 0.2782, 0.5444, 0.2782, -0.0877, 0.1332, -0.1896 };
         private static readonly double KALMAN_GAIN_1 = 0.2138;
         private static readonly double KALMAN_GAIN_2 = 1.5357;
@@ -50,13 +49,13 @@ namespace TranslationUnit
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
         internal CGyroscope( string id, double normalizer, ISensor nextSensor = null, double deltaT = ( double )1 / 60 )
         {
-            _xFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
-            _yFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
-            _zFilters_large = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
-                                                                                                                   
-            _xFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
-            _yFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
-            _zFilters_small = new IFilter[] { new CFIRFilter( FIR_ORDER_GYRO, FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _xFilters_large = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _yFilters_large = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _zFilters_large = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+                                                                                                   
+            _xFilters_small = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _yFilters_small = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
+            _zFilters_small = new IFilter[] { new CFIRFilter( FIR_COEFF_GYRO ), new CKalmanFilter( KALMAN_GAIN_1, KALMAN_GAIN_2, deltaT ) };
 
             _id = id;
             _nextSensor = nextSensor;
@@ -113,9 +112,23 @@ namespace TranslationUnit
         /// </summary>
         public double[] getValue( int[] input )
         {
-            _x = estimate( ref _x_small, ref _x_large, _xFilters_small, _xFilters_large, input[0]) * _normalizer;
-            _y = estimate( ref _y_small, ref _y_large, _yFilters_small, _yFilters_large, input[1]) * _normalizer;
-            _z = estimate( ref _z_small, ref _z_large, _zFilters_small, _zFilters_large, input[2]) * _normalizer;
+            _x = estimate( ref _x_small, ref _x_large, _xFilters_small, _xFilters_large, input[0]) * _normalizer + 180;
+            _y = estimate( ref _y_small, ref _y_large, _yFilters_small, _yFilters_large, input[1]) * _normalizer + 180;
+            _z = estimate( ref _z_small, ref _z_large, _zFilters_small, _zFilters_large, input[2]) * _normalizer + 180;
+
+            if ( _x > 360 )
+                _x = 360;
+            if ( _y > 360 )
+                _y = 360;
+            if ( _z > 360 )
+                _z = 360;
+
+            if ( _x < 0 )
+                _x = 0;
+            if ( _y < 0 )
+                _y = 0;
+            if ( _z < 0 )
+                _z = 0;
 
             return new double[] { _x, _y, _z };
         }
