@@ -17,6 +17,8 @@ namespace TranslationUnit
 
         internal double integrate( double input )
         {
+            _velocity *= 0.9;
+
             _velocity = ( ( input - _prevAccel ) / 2 + _prevAccel ) * _deltaT + _velocity;
 
             _prevAccel = input;
@@ -31,7 +33,11 @@ namespace TranslationUnit
     class CAccelerometer : CSensor
     {
         private static readonly double[] FIR_COEFF_ACCEL =
-            { -0.0210, -0.0160, -0.0206, -0.0256, -0.0301, -0.0341, -0.0371, -0.0391, 0.9603, -0.0391, -0.0371, -0.0341, -0.0301, -0.0256, -0.0206, -0.0160, -0.0210 }; 
+            { -0.1057, -0.1098, -0.1127, -0.1144, 0.8850, -0.1144, -0.1127, -0.1098, -0.1057 };
+        private static readonly int DEADZONE = 500;
+
+        private static readonly double KALMAN_GAIN_1 = 0.2777;
+        private static readonly double KALMAN_GAIN_2 = 2.6875;
 
         // Used for integration of accelerometer values
         private Integrator _integratorX;
@@ -49,8 +55,8 @@ namespace TranslationUnit
         /// <param name="normalizer"> Normalization coefficient </param>
         /// <param name="nextSensor"> Next sensor (if any) </param>
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
-        internal CAccelerometer( string id, double normalizer, CSensor nextSensor = null, double deltaT = 0.016667, double pF = 0.99 ) 
-            : base()
+        internal CAccelerometer( string id, double normalizer, CSensor nextSensor = null, double deltaT = 0.016667, double pF = 0.9 ) 
+            : base( KALMAN_GAIN_1 , KALMAN_GAIN_2 )
         {
             _id = id;
             _nextSensor = nextSensor;
@@ -73,33 +79,13 @@ namespace TranslationUnit
         /// </summary>
         public override double[] getValue( int[] input )
         {
-            double x = estimate( ref _x_small, ref _x_large, _xFilters_small, _xFilters_large, input[0] );
-            double y = estimate( ref _y_small, ref _y_large, _yFilters_small, _yFilters_large, input[1] );
-            double z = estimate( ref _z_small, ref _z_large, _zFilters_small, _zFilters_large, input[2] );
+            double x = estimate( ref _x_small /*unused*/, ref _x_large, _xFilters_small /*unused*/, _xFilters_large, input[0] );
+            double y = estimate( ref _y_small /*unused*/, ref _y_large, _yFilters_small /*unused*/, _yFilters_large, input[1] );
+            double z = estimate( ref _z_small /*unused*/, ref _z_large, _zFilters_small /*unused*/, _zFilters_large, input[2] );
 
-            try
-            {
-                for ( int i = 0; i < _xFilters.Length; ++i )
-                    x = _xFilters[i].filter( x )[0];
-
-                for ( int i = 0; i < _yFilters.Length; ++i )
-                    y = _yFilters[i].filter( y )[0];
-
-                for ( int i = 0; i < _zFilters.Length; ++i )
-                    z = _zFilters[i].filter( z )[0];
-
-                x = _integratorX.integrate( x );
-                y = _integratorY.integrate( y );
-                z = _integratorZ.integrate( z );
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
-
-            _x = x * _normalizer;
-            _y = y * _normalizer;
-            _z = z * _normalizer;
+            _x = _integratorX.integrate( x ) * _normalizer;
+            _y = _integratorY.integrate( y ) * _normalizer;
+            _z = _integratorZ.integrate( z ) * _normalizer;
 
             return new double[] { _x, _y, _z };
         }
@@ -113,10 +99,36 @@ namespace TranslationUnit
 
             return new double[] { _x, _y, _z };
         }
+
+        protected override double estimate( ref double small, ref double large, IFilter[] filters_small, IFilter[] filters_large, int input )
+        {
+            double x_large = 0;
+            double dx_large = 0;
+
+            double[] xVec = new double[2] { 0, 0 };
+
+            if ( DEADZONE < Math.Abs( input ) )
+                x_large = input;
+            else
+                x_large = large;
+
+            for ( int i = 0; i < filters_large.Length; ++i )
+            {
+                xVec = filters_large[i].filter( x_large );
+                x_large = xVec[0];
+                dx_large = xVec[1];
+            }
+
+            large = _probabilityFactor * ( x_large + _deltaT * dx_large );
+
+            return x_large;
+        }
     }
 
     class MockAccelerometer : CSensor
     {
+        MockAccelerometer() : base( 0, 0 ) { }
+
         public override double[] getState()
         {
             return new double[] { 0, 0, 0 };
@@ -125,6 +137,11 @@ namespace TranslationUnit
         public override double[] getValue( int[] input )
         {
             return new double[] { input[0], input[1], input[2] };
+        }
+
+        protected override double estimate( ref double small, ref double large, IFilter[] filters_small, IFilter[] filters_large, int input )
+        {
+            throw new NotImplementedException();
         }
     }
 }
