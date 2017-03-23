@@ -50,6 +50,24 @@ namespace TranslationUnit
             if ( _z < 0 )
                 _z = 0;
 
+            _x -= _x_offset;
+            _y -= _y_offset;
+            _z -= _z_offset;
+
+            if ( _x > 360 )
+                _x -= 360;
+            if ( _y > 360 )
+                _y -= 360;
+            if ( _z > 360 )
+                _z -= 360;
+
+            if ( _x < 0 )
+                _x += 360;
+            if ( _y < 0 )
+                _y += 360;
+            if ( _z < 0 )
+                _z += 360;
+
             return new double[] { _x, _y, _z };
         }
 

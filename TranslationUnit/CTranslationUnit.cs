@@ -53,6 +53,8 @@ namespace TranslationUnit
         private const double NORMALIZE_ACCEL = 0.0001;
         private const double NORMALIZE_GYRO = 0.005493164063;
 
+        private const int CALIBRATION = 30;
+
         private const int BAUDRATE = 38400;
         private const int DATABITS = 8;
         private const Handshake HANDSHAKE = Handshake.None;
@@ -389,6 +391,8 @@ namespace TranslationUnit
             byte[] readBytes = new byte[7];
             eSensor sensor = null;
 
+            int count = 0;
+
             while ( _readThreadFlag )
             {
                 for ( int i = 0; i < 8; ++i )
@@ -434,7 +438,15 @@ namespace TranslationUnit
 
                             double[] processed = _sensorMap[sensor].getValue( new int[] { raw_x, raw_y, raw_z } );
 
+                            if ( ( count <= CALIBRATION ) && ( sensor.type() == eSensorType.Gyroscope ) )
+                            {
+                                if ( count == CALIBRATION )
+                                    _sensorMap[sensor].setOffsets( processed[0], processed[1], processed[2] );
+                                count++;
+                            }
+
                             _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+
                         }
                         catch ( FormatException )
                         {

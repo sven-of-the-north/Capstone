@@ -11,6 +11,10 @@ namespace TranslationUnit
         protected double _deltaT;
         protected double _probabilityFactor;
 
+        protected double _x_offset = 0;
+        protected double _y_offset = 0;
+        protected double _z_offset = 0;
+
         // --- Estimator variables --- 
         private static readonly double[] FIR_COEFF = { 0.2782, 0.4437, 0.2782 };
 
@@ -58,6 +62,13 @@ namespace TranslationUnit
         /// </summary>
         /// <returns> Last calculated output values [x, y, z] </returns>
         public abstract double[] getState();
+
+        public void setOffsets (double x, double y, double z)
+        {
+            _x_offset = x;
+            _y_offset = y;
+            _z_offset = z;
+        }
 
         protected abstract double estimate( ref double small, ref double large, IFilter[] filters_small, IFilter[] filters_large, int input );
     }
