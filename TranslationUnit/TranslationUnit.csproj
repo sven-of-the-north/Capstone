@@ -47,7 +47,7 @@
     <Compile Include="CTranslationUnit.cs" />
     <Compile Include="eSensor.cs" />
     <Compile Include="IFilter.cs" />
-    <Compile Include="ISensor.cs" />
+    <Compile Include="CSensor.cs" />
     <Compile Include="ITranslationUnit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

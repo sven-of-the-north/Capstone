@@ -51,7 +51,7 @@ namespace TranslationUnit
     public class CTranslationUnit : ITranslationUnit
     {
         private const double NORMALIZE_ACCEL = 0.000061;
-        private const double NORMALIZE_GYRO = 0.010986328;
+        private const double NORMALIZE_GYRO = 0.005493164063;
 
         private const int BAUDRATE = 38400;
         private const int DATABITS = 8;
@@ -63,7 +63,7 @@ namespace TranslationUnit
         private bool DEBUG_UNITY = true;
 
         private volatile Dictionary<eSensor, float[]> _valueMap;
-        private Dictionary<eSensor, ISensor> _sensorMap;
+        private Dictionary<eSensor, CSensor> _sensorMap;
         private SerialPort _serialPort;
 
         Thread _brakeThread = null;
@@ -277,7 +277,7 @@ namespace TranslationUnit
                 _valueMap = new Dictionary<eSensor, float[]>();
 
             if ( _sensorMap == null )
-                _sensorMap = new Dictionary<eSensor, ISensor>();
+                _sensorMap = new Dictionary<eSensor, CSensor>();
 
             _valueMap.Clear();
             _sensorMap.Clear();
