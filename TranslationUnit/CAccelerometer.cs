@@ -17,8 +17,6 @@ namespace TranslationUnit
 
         internal double integrate( double input )
         {
-            _velocity *= 0.9;
-
             _velocity = ( ( input - _prevAccel ) / 2 + _prevAccel ) * _deltaT + _velocity;
 
             _prevAccel = input;
@@ -32,8 +30,11 @@ namespace TranslationUnit
     /// </summary>
     class CAccelerometer : CSensor
     {
-        private static readonly double[] FIR_COEFF_ACCEL =
-            { -0.1057, -0.1098, -0.1127, -0.1144, 0.8850, -0.1144, -0.1127, -0.1098, -0.1057 };
+        //private static readonly double[] FIR_COEFF_ACCEL =
+        //    { -0.1057, -0.1098, -0.1127, -0.1144, 0.8850, -0.1144, -0.1127, -0.1098, -0.1057 };
+
+        private double[] FIR_COEFF_ACCEL;
+        private static readonly int FIR_ORDER = 30;
         private static readonly int DEADZONE = 500;
 
         private static readonly double KALMAN_GAIN_1 = 0.2777;
@@ -64,6 +65,8 @@ namespace TranslationUnit
             _probabilityFactor = pF;
             _deltaT = deltaT;
 
+            generateFIRcoefficients();
+
             _xFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ) };
             _yFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ) };
             _zFilters = new IFilter[] { new CFIRFilter( FIR_COEFF_ACCEL ) };
@@ -86,6 +89,19 @@ namespace TranslationUnit
             _x = _integratorX.integrate( x ) * _normalizer;
             _y = _integratorY.integrate( y ) * _normalizer;
             _z = _integratorZ.integrate( z ) * _normalizer;
+
+            System.Diagnostics.Debug.WriteLine( string.Format( "{0}, {1}, {2}", _x, _y, _z ) );
+            
+            /*
+            for ( int i = 0; i < _xFilters.Length; ++i )
+                _x -= _xFilters[i].filter( _x )[0];
+
+            for ( int i = 0; i < _yFilters.Length; ++i )
+                _y -= _yFilters[i].filter( _y )[0];
+
+            for ( int i = 0; i < _zFilters.Length; ++i )
+                _z -= _zFilters[i].filter( _z )[0];
+            */
 
             return new double[] { _x, _y, _z };
         }
@@ -122,6 +138,22 @@ namespace TranslationUnit
             large = _probabilityFactor * ( x_large + _deltaT * dx_large );
 
             return x_large;
+        }
+
+        private void generateFIRcoefficients()
+        {
+            FIR_COEFF_ACCEL = new double[FIR_ORDER];
+            double sum = 0;
+
+            for ( int i = FIR_ORDER; i > 0; --i )
+            {
+                double coeff = Math.Log( i );
+                FIR_COEFF_ACCEL[FIR_ORDER - i] = coeff;
+                sum += coeff;
+            }
+
+            for ( int i = 0; i < FIR_ORDER; ++i )
+                FIR_COEFF_ACCEL[i] /= sum;
         }
     }
 

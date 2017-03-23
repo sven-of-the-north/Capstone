@@ -50,7 +50,7 @@ namespace TranslationUnit
     /// </summary>
     public class CTranslationUnit : ITranslationUnit
     {
-        private const double NORMALIZE_ACCEL = 0.001;
+        private const double NORMALIZE_ACCEL = 0.0001;
         private const double NORMALIZE_GYRO = 0.005493164063;
 
         private const int BAUDRATE = 38400;
