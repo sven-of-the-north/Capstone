@@ -35,7 +35,7 @@ namespace TranslationUnit
 
         private double[] FIR_COEFF_ACCEL;
         private static readonly int FIR_ORDER = 30;
-        private static readonly int DEADZONE = 500;
+        private static readonly int DEADZONE = 2400;
 
         private static readonly double KALMAN_GAIN_1 = 0.2777;
         private static readonly double KALMAN_GAIN_2 = 2.6875;
@@ -86,10 +86,6 @@ namespace TranslationUnit
             double y = estimate( ref _y_small /*unused*/, ref _y_large, _yFilters_small /*unused*/, _yFilters_large, input[1] );
             double z = estimate( ref _z_small /*unused*/, ref _z_large, _zFilters_small /*unused*/, _zFilters_large, input[2] );
 
-            _x = _integratorX.integrate( x ) * _normalizer;
-            _y = _integratorY.integrate( y ) * _normalizer;
-            _z = _integratorZ.integrate( z ) * _normalizer;
-            
             /*
             for ( int i = 0; i < _xFilters.Length; ++i )
                 _x -= _xFilters[i].filter( _x )[0];
@@ -100,6 +96,14 @@ namespace TranslationUnit
             for ( int i = 0; i < _zFilters.Length; ++i )
                 _z -= _zFilters[i].filter( _z )[0];
             */
+
+            _x = _integratorX.integrate( x ) * _normalizer;
+            _y = _integratorY.integrate( y ) * _normalizer;
+            _z = _integratorZ.integrate( z ) * _normalizer;
+
+            //_x -= 0.0061;
+            //_y += 0.3027;
+            //_z += 0.3027;
 
             return new double[] { _x, _y, _z };
         }

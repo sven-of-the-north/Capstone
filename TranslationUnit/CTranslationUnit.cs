@@ -148,16 +148,25 @@ namespace TranslationUnit
 
         public bool serialStatus()
         {
+            if ( _serialPort == null )
+                return false;
+
             return _serialPort.IsOpen;
         }
 
         public bool brakeThreadStatus()
         {
+            if ( _brakeThread == null )
+                return false;
+
             return _brakeThread.IsAlive;
         }
 
         public bool readThreadStatus()
         {
+            if ( _readThread == null )
+                return false;
+
             return _readThread.IsAlive;
         }
 
