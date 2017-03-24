@@ -61,8 +61,16 @@
         /// <returns></returns>
         bool serialStatus();
 
+        /// <summary>
+        /// Returns if the brake thread is alive
+        /// </summary>
+        /// <returns></returns>
         bool brakeThreadStatus();
 
+        /// <summary>
+        /// Returns if the read thread is alive
+        /// </summary>
+        /// <returns></returns>
         bool readThreadStatus();
     }
 }

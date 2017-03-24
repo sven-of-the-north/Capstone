@@ -89,8 +89,6 @@ namespace TranslationUnit
             _x = _integratorX.integrate( x ) * _normalizer;
             _y = _integratorY.integrate( y ) * _normalizer;
             _z = _integratorZ.integrate( z ) * _normalizer;
-
-            System.Diagnostics.Debug.WriteLine( string.Format( "{0}, {1}, {2}", _x, _y, _z ) );
             
             /*
             for ( int i = 0; i < _xFilters.Length; ++i )

@@ -391,7 +391,9 @@ namespace TranslationUnit
             byte[] readBytes = new byte[7];
             eSensor sensor = null;
 
-            int count = 0;
+            Dictionary<eSensor, int> calibrations = new Dictionary<eSensor, int>();
+            foreach ( eSensor elem in eSensor.values() )
+                calibrations.Add( elem, 0 );
 
             while ( _readThreadFlag )
             {
@@ -438,14 +440,14 @@ namespace TranslationUnit
 
                             double[] processed = _sensorMap[sensor].getValue( new int[] { raw_x, raw_y, raw_z } );
 
-                            if ( ( count <= CALIBRATION ) && ( sensor.type() == eSensorType.Gyroscope ) )
+                            if ( ( calibrations[sensor] <= CALIBRATION ) && ( sensor.type() == eSensorType.Gyroscope ) )
                             {
-                                if ( count == CALIBRATION )
+                                if ( calibrations[sensor] == CALIBRATION )
                                     _sensorMap[sensor].setOffsets( processed[0], processed[1], processed[2] );
-                                count++;
+                                calibrations[sensor]++;
                             }
 
-                            _valueMap[sensor] = new float[] { ( float )processed[0], ( float )processed[1], ( float )processed[2] };
+                            _valueMap[sensor] = new float[] { ( float )-processed[1], ( float )-processed[2], ( float )-processed[0] };
 
                         }
                         catch ( FormatException )
