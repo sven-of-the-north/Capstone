@@ -54,13 +54,12 @@ namespace TranslationUnit
         /// </summary>
         /// <param name="id"> Name </param>
         /// <param name="normalizer"> Normalization coefficient </param>
-        /// <param name="nextSensor"> Next sensor (if any) </param>
         /// <param name="deltaT"> Time step (s) for integration (default: 60Hz) </param>
-        internal CAccelerometer( string id, double normalizer, CSensor nextSensor = null, double deltaT = 0.016667, double pF = 0.9 ) 
+        /// <param name="pF"> Probability factor used for estimation </param>
+        internal CAccelerometer( string id, double normalizer, double deltaT = 0.016667, double pF = 0.9 ) 
             : base( KALMAN_GAIN_1 , KALMAN_GAIN_2 )
         {
             _id = id;
-            _nextSensor = nextSensor;
             _normalizer = normalizer;
             _probabilityFactor = pF;
             _deltaT = deltaT;

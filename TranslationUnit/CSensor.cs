@@ -7,7 +7,6 @@ namespace TranslationUnit
         // Sensor parameters
         protected string _id;
         protected double _normalizer;
-        protected CSensor _nextSensor;
         protected double _deltaT;
         protected double _probabilityFactor;
 

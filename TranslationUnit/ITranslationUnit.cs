@@ -1,12 +1,14 @@
 ﻿namespace TranslationUnit
 {
+    /// <summary>
+    /// TranslationUnit API
+    /// </summary>
     public interface ITranslationUnit
     {
         /// <summary>
         /// (Re-)Initializes all parameters and data fields within the Translation Unit
         /// </summary>
-        /// <param name="portName"> Serial port name </param>
-        /// <returns> Initialization successful or not </returns>
+        /// <returns> Returns true if the serial port initialized successfully; false otherwise. </returns>
         bool initialize();
 
         /// <summary>
@@ -20,27 +22,27 @@
         float[] readSensor( eSensor sensorID, float x = -1, float y = -1, float z = -1 );
 
         /// <summary>
-        /// Starts writing to the brakes
+        /// Starts the brake thread
         /// </summary>
-        /// <returns>True if the brake thread is started; False if the brake thread is still dead</returns>
+        /// <returns> Returns true if the brake thread is alive; false otherwise. </returns>
         bool startBrakeThread();
 
         /// <summary>
-        /// Stops writing to the brakes
+        /// Stops the brake thread
         /// </summary>
-        /// <returns>True if the brake thread is stopped; False if the brake thread is still alive</returns>
+        /// <returns> Returns true if the brake thread is dead; false otherwise. </returns>
         bool stopBrakeThread();
 
         /// <summary>
-        /// Starts polling the serial port
+        /// Starts the read thread
         /// </summary>
-        /// <returns></returns>
+        /// <returns> Returns true if the read thread is alive; false otherwise. </returns>
         bool startReadThread();
 
         /// <summary>
-        /// Stops polling the serial port
+        /// Stops the read thread
         /// </summary>
-        /// <returns></returns>
+        /// <returns> Returns true if the read thread is dead; false otherwise. </returns>
         bool stopReadThread();
 
         /// <summary>
@@ -56,21 +58,21 @@
         void releaseBrake( eMotor brakeID );
 
         /// <summary>
-        /// Returns serial port status
+        /// Returns serial port state
         /// </summary>
-        /// <returns></returns>
+        /// <returns> Returns true if the serial port is open; false otherwise. </returns>
         bool serialStatus();
 
         /// <summary>
-        /// Returns if the brake thread is alive
+        /// Returns brake thread state
         /// </summary>
-        /// <returns></returns>
+        /// <returns> Returns true if the brake thread is alive; false otherwise. </returns>
         bool brakeThreadStatus();
 
         /// <summary>
-        /// Returns if the read thread is alive
+        /// Returns read thread state
         /// </summary>
-        /// <returns></returns>
+        /// <returns> Returns true if the read thread is alive; false otherwise. </returns>
         bool readThreadStatus();
     }
 }

@@ -15,7 +15,6 @@ namespace TranslationUnit
         /// <summary>
         /// Constructor for FIR filter
         /// </summary>
-        /// <param name="order"> Order of this filter </param>
         /// <param name="coefficients"> Coefficients for computation </param>
         internal CFIRFilter( double[] coefficients )
         {

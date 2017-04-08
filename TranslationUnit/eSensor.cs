@@ -12,6 +12,7 @@ namespace TranslationUnit
         private static readonly Dictionary<string, eSensor> _name_to_value = new Dictionary<string,eSensor>();
         private static readonly Dictionary<eSensor, string> _value_to_name = new Dictionary<eSensor,string>();
 
+#pragma warning disable CS1591
         public static readonly eSensor Hand_Accel    = new eSensor( "a0" ); //0x10
         public static readonly eSensor Hand_Gyro     = new eSensor( "g0" ); //0x20
         public static readonly eSensor Thumb_Prox    = new eSensor( "g1" ); //0x30
@@ -27,6 +28,7 @@ namespace TranslationUnit
         public static readonly eSensor Middle_Prox_a = new eSensor( "a5" );
         public static readonly eSensor Middle_Dist_a = new eSensor( "a6" );*/
         public static readonly eSensor Invalid       = new eSensor( "NA" ); //0xFF
+#pragma warning restore CS1591
 
         private eSensor( string name )
         {
@@ -39,11 +41,19 @@ namespace TranslationUnit
             _value_to_name[this] = name;
         }
 
+        /// <summary>
+        /// Returns string representation of a sensor enum
+        /// </summary>
+        /// <returns> Sensor name as a string </returns>
         public override string ToString()
         {
             return _name;
         }
 
+        /// <summary>
+        /// Returns the type of the sensor associated with this enum
+        /// </summary>
+        /// <returns> eSensorType.Accelerometer or eSensorType.Gyroscope </returns>
         public eSensorType type()
         {
             switch ( _name[0] )
@@ -57,11 +67,19 @@ namespace TranslationUnit
             }
         }
 
+        /// <summary>
+        /// Returns all sensor names
+        /// </summary>
+        /// <returns> List of all ( implemented ) sensors </returns>
         public static List<string> values()
         {
             return new List<string>( _name_to_value.Keys );
         }
         
+        /// <summary>
+        /// Converts a sensor name to a sensor enum
+        /// </summary>
+        /// <param name="str"> Sensor name </param>
         public static explicit operator eSensor( string str )
         {
             eSensor result;
@@ -71,6 +89,10 @@ namespace TranslationUnit
                 throw new InvalidCastException();
         }
 
+        /// <summary>
+        /// Converts a byte value to a sensor enum
+        /// </summary>
+        /// <param name="val"> Sensor byte ( hex value ) </param>
         public static explicit operator eSensor( byte val )
         {
             switch ( val )
@@ -96,6 +118,10 @@ namespace TranslationUnit
             }
         }
 
+        /// <summary>
+        /// Converts a sensor enum to a sensor name
+        /// </summary>
+        /// <param name="sensor"> Sensor enum </param>
         public static explicit operator string( eSensor sensor )
         {
             string result;

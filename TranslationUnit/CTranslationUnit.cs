@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace TranslationUnit
 {
+#pragma warning disable CS1591
     /// <summary>
     /// Motor bitmasks
     /// </summary>
@@ -44,6 +45,7 @@ namespace TranslationUnit
           System.Runtime.Serialization.SerializationInfo info,
           System.Runtime.Serialization.StreamingContext context ) : base( info, context ) { }
     }
+#pragma warning restore CS1591
 
     /// <summary>
     /// Main object used to represent the state of the Force Feedback Glove
@@ -79,11 +81,6 @@ namespace TranslationUnit
         /// Constructor for a Translation Unit object
         /// </summary>
         /// <param name="portName"> Serial port name </param>
-        /// <param name="baudRate"> Serial port baud rate (default 115200) </param>
-        /// <param name="dataBits"> Serial port data bits (default 8) </param>
-        /// <param name="handshake"> Serial port handshaking value (default None) </param>
-        /// <param name="parity"> Serial port parity value (default None) </param>
-        /// <param name="stopBits"> Serial port number of stopbits per byte (default One) </param>
         public CTranslationUnit( string portName )
         {
             PORTNAME = portName;
@@ -146,6 +143,10 @@ namespace TranslationUnit
             _motorCommand[0] &= ( byte )( 255 ^ ( byte )brakeID );
         }
 
+        /// <summary>
+        /// Returns serial port state
+        /// </summary>
+        /// <returns> Returns true if the serial port is open; false otherwise. </returns>
         public bool serialStatus()
         {
             if ( _serialPort == null )
@@ -154,6 +155,10 @@ namespace TranslationUnit
             return _serialPort.IsOpen;
         }
 
+        /// <summary>
+        /// Returns brake thread state
+        /// </summary>
+        /// <returns> Returns true if the brake thread is alive; false otherwise. </returns>
         public bool brakeThreadStatus()
         {
             if ( _brakeThread == null )
@@ -162,6 +167,10 @@ namespace TranslationUnit
             return _brakeThread.IsAlive;
         }
 
+        /// <summary>
+        /// Returns read thread state
+        /// </summary>
+        /// <returns> Returns true if the read thread is alive; false otherwise. </returns>
         public bool readThreadStatus()
         {
             if ( _readThread == null )
@@ -170,6 +179,10 @@ namespace TranslationUnit
             return _readThread.IsAlive;
         }
 
+        /// <summary>
+        /// Starts the brake thread
+        /// </summary>
+        /// <returns> Returns true if the brake thread is alive; false otherwise. </returns>
         public bool startBrakeThread()
         {
             if ( _brakeThread != null )
@@ -195,6 +208,10 @@ namespace TranslationUnit
             return _brakeThread.IsAlive;
         }
 
+        /// <summary>
+        /// Stops the brake thread
+        /// </summary>
+        /// <returns> Returns true if the brake thread is dead; false otherwise. </returns>
         public bool stopBrakeThread()
         {
             if ( _brakeThread == null )
@@ -209,6 +226,10 @@ namespace TranslationUnit
             return !_brakeThread.IsAlive;
         }
 
+        /// <summary>
+        /// Starts the read thread
+        /// </summary>
+        /// <returns> Returns true if the read thread is alive; false otherwise. </returns>
         public bool startReadThread()
         {
             if ( _readThread != null )
@@ -234,6 +255,10 @@ namespace TranslationUnit
             return _readThread.IsAlive;
         }
 
+        /// <summary>
+        /// Stops the read thread
+        /// </summary>
+        /// <returns> Returns true if the read thread is dead; false otherwise. </returns>
         public bool stopReadThread()
         {
             if ( _readThread == null )
@@ -251,8 +276,7 @@ namespace TranslationUnit
         /// <summary>
         /// (Re-)Initializes all parameters and data fields within the Translation Unit
         /// </summary>
-        /// <param name="portName"> Serial port name </param>
-        /// <returns> Initialization successful or not </returns>
+        /// <returns> Returns true if the serial port initialized successfully; false otherwise. </returns>
         public bool initialize()
         {
             if ( _serialPort != null )
@@ -326,6 +350,10 @@ namespace TranslationUnit
             }
         }
 
+        /// <summary>
+        /// Initializes serial port
+        /// </summary>
+        /// <returns> Returns true if the serial port is open; false otherwise. </returns>
         private bool _initializeSerial()
         {
             try
@@ -553,85 +581,185 @@ namespace TranslationUnit
         */
     }
 
+    /// <summary>
+    /// Mock object for testing with TranslationUnit, even without a serial port. ** MAY NOT BE FULLY IMPLEMENTED **
+    /// </summary>
     public class MockTranslationUnit : ITranslationUnit
     {
+        bool _initialized = false;
         bool _readThreadState = false;
         bool _writeThreadState = false;
 
+        /// <summary>
+        /// MockTranslationUnit constructor - empty object created
+        /// </summary>
         public MockTranslationUnit(){}
 
+        /// <summary>
+        /// Pretends to apply a brake - does nothing
+        /// </summary>
+        /// <param name="brakeID"> Ignored </param>
         public void applyBrake( eMotor brakeID )
         {
             return;
         }
 
+        /// <summary>
+        /// Pretends to release a brake - does nothing
+        /// </summary>
+        /// <param name="brakeID"> Ignored </param>
         public void releaseBrake( eMotor brakeID )
         {
             return;
         }
 
+        /// <summary>
+        /// Pretends to start the brake thread - sets writeThreadState flag to true if it was false
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns> Returns true if the internal writeThreadState was false </returns>
         public bool startBrakeThread()
         {
-            if ( !_writeThreadState )
-                _writeThreadState = true;
-            else
-                _writeThreadState = false;
+            if ( !_initialized )
+                return false;
 
-            return _writeThreadState;
+            if ( !_writeThreadState )
+            {
+                _writeThreadState = true;
+                return _writeThreadState;
+            }
+            else
+            {
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Pretends to stop the brake thread - sets writeThreadState flag to false if it was true
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns> Returns true if the internal writeThreadState was true; false otherwise </returns>
         public bool stopBrakeThread()
         {
-            if ( _writeThreadState )
-                _writeThreadState = false;
-            else
-                _writeThreadState = true;
+            if ( !_initialized )
+                return false;
 
-            return _writeThreadState;
+            if ( _writeThreadState )
+            {
+                _writeThreadState = false;
+                return !_writeThreadState;
+            }
+            else
+            {
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Pretends to start the read thread - sets readThreadState flag to true if it was false
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns> Returns true if the internal readThreadState was false </returns>
         public bool startReadThread()
         {
-            if ( !_readThreadState )
-                _readThreadState = true;
-            else
-                _readThreadState = false;
+            if ( !_initialized )
+                return false;
 
-            return _readThreadState;
+            if ( !_readThreadState )
+            {
+                _readThreadState = true;
+                return _readThreadState;
+            }
+            else
+            {
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Pretends to stop the read thread - sets readThreadState flag to false if it was true
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns> Returns true if the internal readThreadState was true </returns>
         public bool stopReadThread()
         {
-            if ( _readThreadState )
-                _readThreadState = false;
-            else
-                _readThreadState = true;
+            if ( !_initialized )
+                return false;
 
-            return _readThreadState;
+            if ( _readThreadState )
+            {
+                _readThreadState = false;
+                return !_readThreadState;
+            }
+            else
+            {
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Pretends to initialize the TranslationUnit - sets initialized flag to true
+        /// </summary>
+        /// <returns> Returns initialized flag status </returns>
         public bool initialize()
         {
-            return true;
+            _initialized = true;
+            return _initialized;
         }
 
+        /// <summary>
+        /// Pretends to check the serial port status
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns> Returns true </returns>
         public bool serialStatus()
         {
+            if ( !_initialized )
+                return false;
+
             return true;
         }
 
+        /// <summary>
+        /// Pretends to check the brake thread status
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns></returns>
         public bool brakeThreadStatus()
         {
+            if ( !_initialized )
+                return false;
+
             return _writeThreadState;
         }
 
+        /// <summary>
+        /// Pretends to check the read thread status
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <returns></returns>
         public bool readThreadStatus()
         {
+            if ( !_initialized )
+                return false;
+
             return _readThreadState;
         }
 
+        /// <summary>
+        /// Pretends to read a sensor - echoes the passed arguments 
+        /// Requires the initialized flag to be true
+        /// </summary>
+        /// <param name="sensorID"> Ignored </param>
+        /// <param name="x"> X value to echo </param>
+        /// <param name="y"> Y value to echo </param>
+        /// <param name="z"> Z value to echo </param>
+        /// <returns> The x, y, z values that were passed </returns>
         public float[] readSensor( eSensor sensorID, float x, float y, float z )
         {
+            if ( !_initialized )
+                return new float[] { float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity };
+
             return new float[] { x, y, z };
         }
     }
